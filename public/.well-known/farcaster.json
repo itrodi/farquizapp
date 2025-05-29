@@ -1,0 +1,18 @@
+{
+    "accountAssociation": {
+      "header": "",
+      "payload": "",
+      "signature": ""
+    },
+    "frame": {
+      "version": "1",
+      "name": "FarQuiz",
+      "iconUrl": "https://yourdomain.com/logo.png",
+      "homeUrl": "https://yourdomain.com",
+      "imageUrl": "https://yourdomain.com/og-image.png",
+      "buttonTitle": "🧠 Play Quiz",
+      "splashImageUrl": "https://yourdomain.com/splash.png",
+      "splashBackgroundColor": "#7c3aed",
+      "webhookUrl": "https://yourdomain.com/api/webhook"
+    }
+  }

@@ -1,0 +1,70 @@
+.quiz-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+  }
+  
+  .progress-text {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  
+  .progress-text .current {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-size: 16px;
+  }
+  
+  .progress-text .separator {
+    color: var(--text-muted);
+  }
+  
+  .progress-text .total {
+    color: var(--text-secondary);
+  }
+  
+  .progress-bar {
+    flex: 1;
+    height: 6px;
+    background-color: var(--surface-dark);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .progress-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+    border-radius: 3px;
+    transition: width 0.3s ease-out;
+    position: relative;
+  }
+  
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.2) 50%,
+      transparent 100%
+    );
+    animation: shimmer 2s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }

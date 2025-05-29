@@ -1,0 +1,101 @@
+{
+    "title": "Farcaster Trivia",
+    "description": "Test your knowledge about the Farcaster protocol and ecosystem",
+    "category": "web3",
+    "difficulty": "medium",
+    "time_limit": 180,
+    "emoji": "🟪",
+    "questions": [
+      {
+        "text": "Who are the co-founders of Farcaster?",
+        "type": "multiple_choice",
+        "correct": "Dan Romero and Varun Srinivasan",
+        "options": [
+          "Dan Romero and Varun Srinivasan",
+          "Vitalik Buterin and Dan Romero",
+          "Brian Armstrong and Varun Srinivasan",
+          "Chris Dixon and Marc Andreessen"
+        ],
+        "points": 1,
+        "explanation": "Dan Romero and Varun Srinivasan co-founded Farcaster after leaving Coinbase."
+      },
+      {
+        "text": "What is the native currency used in Farcaster for onchain actions?",
+        "type": "type_in",
+        "correct": "Warps",
+        "points": 2,
+        "explanation": "Warps are used for onchain actions like registrations and storage."
+      },
+      {
+        "text": "Which blockchain does Farcaster use for its onchain registry?",
+        "type": "multiple_choice",
+        "correct": "Optimism",
+        "options": [
+          "Ethereum",
+          "Optimism",
+          "Base",
+          "Arbitrum"
+        ],
+        "points": 1,
+        "explanation": "Farcaster uses Optimism (OP Mainnet) for its onchain contracts."
+      },
+      {
+        "text": "What is a 'cast' in Farcaster terminology?",
+        "type": "multiple_choice",
+        "correct": "A message or post",
+        "options": [
+          "A message or post",
+          "A type of NFT",
+          "A wallet address",
+          "A smart contract"
+        ],
+        "points": 1
+      },
+      {
+        "text": "What is the maximum character limit for a cast?",
+        "type": "multiple_choice",
+        "correct": "320",
+        "options": [
+          "280",
+          "320",
+          "500",
+          "1000"
+        ],
+        "points": 1,
+        "explanation": "Farcaster allows up to 320 characters per cast."
+      },
+      {
+        "text": "What are Farcaster Frames?",
+        "type": "multiple_choice",
+        "correct": "Interactive apps that run inside casts",
+        "options": [
+          "Interactive apps that run inside casts",
+          "Profile picture borders",
+          "Video attachments",
+          "Group chats"
+        ],
+        "points": 1,
+        "explanation": "Frames are interactive applications that can be embedded in casts."
+      },
+      {
+        "text": "What does FID stand for?",
+        "type": "type_in",
+        "correct": "Farcaster ID",
+        "points": 2,
+        "explanation": "FID (Farcaster ID) is the unique identifier for each Farcaster account."
+      },
+      {
+        "text": "Which popular Farcaster client is developed by the Farcaster team?",
+        "type": "multiple_choice",
+        "correct": "Warpcast",
+        "options": [
+          "Warpcast",
+          "Supercast",
+          "Yup",
+          "Paragraph"
+        ],
+        "points": 1,
+        "explanation": "Warpcast is the official client developed by the Farcaster team."
+      }
+    ]
+  }

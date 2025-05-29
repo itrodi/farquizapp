@@ -1,0 +1,74 @@
+[
+    {
+      "name": "Geography",
+      "slug": "geography",
+      "emoji": "🌍",
+      "description": "Test your knowledge of countries, capitals, and landmarks"
+    },
+    {
+      "name": "Sports",
+      "slug": "sports",
+      "emoji": "⚽",
+      "description": "All about sports, teams, and athletic achievements"
+    },
+    {
+      "name": "Entertainment",
+      "slug": "entertainment",
+      "emoji": "🎬",
+      "description": "Movies, TV shows, music, and pop culture"
+    },
+    {
+      "name": "Science",
+      "slug": "science",
+      "emoji": "🔬",
+      "description": "Explore the wonders of science and nature"
+    },
+    {
+      "name": "History",
+      "slug": "history",
+      "emoji": "📚",
+      "description": "Journey through historical events and figures"
+    },
+    {
+      "name": "Food & Drink",
+      "slug": "food-drink",
+      "emoji": "🍕",
+      "description": "Culinary knowledge and global cuisines"
+    },
+    {
+      "name": "Technology",
+      "slug": "technology",
+      "emoji": "💻",
+      "description": "Tech trends, gadgets, and digital innovation"
+    },
+    {
+      "name": "Art & Literature",
+      "slug": "art-literature",
+      "emoji": "🎨",
+      "description": "Creative arts, books, and artistic movements"
+    },
+    {
+      "name": "Music",
+      "slug": "music",
+      "emoji": "🎵",
+      "description": "Musical genres, artists, and compositions"
+    },
+    {
+      "name": "Web3",
+      "slug": "web3",
+      "emoji": "₿",
+      "description": "Cryptocurrency, blockchain, and decentralized tech"
+    },
+    {
+      "name": "Farcaster",
+      "slug": "farcaster",
+      "emoji": "🟪",
+      "description": "All about the Farcaster protocol and ecosystem"
+    },
+    {
+      "name": "General Knowledge",
+      "slug": "general-knowledge",
+      "emoji": "🧠",
+      "description": "A mix of topics to test your overall knowledge"
+    }
+  ]

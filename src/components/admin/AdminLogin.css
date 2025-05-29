@@ -1,0 +1,105 @@
+.admin-login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--background-dark);
+    padding: 20px;
+  }
+  
+  .admin-login-container {
+    width: 100%;
+    max-width: 400px;
+    background-color: var(--surface-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  }
+  
+  .admin-login-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  
+  .admin-login-logo {
+    width: 64px;
+    height: 64px;
+    background-color: var(--primary-color);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: white;
+  }
+  
+  .admin-login-header h1 {
+    font-size: 24px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  
+  .admin-login-header p {
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+  
+  .admin-login-form {
+    margin-bottom: 24px;
+  }
+  
+  .admin-login-error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+  
+  .input-wrapper {
+    position: relative;
+  }
+  
+  .input-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+  }
+  
+  .form-input.with-icon {
+    padding-left: 48px;
+  }
+  
+  .admin-login-btn {
+    width: 100%;
+    margin-top: 24px;
+    height: 48px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  
+  .admin-login-footer {
+    text-align: center;
+  }
+  
+  .back-to-app {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px;
+    transition: color 0.2s;
+  }
+  
+  .back-to-app:hover {
+    color: var(--primary-color);
+  }
