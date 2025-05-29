@@ -1,18 +1,18 @@
 {
-    "accountAssociation": {
-      "header": "",
-      "payload": "",
-      "signature": ""
-    },
-    "frame": {
-      "version": "1",
-      "name": "FarQuiz",
-      "iconUrl": "https://yourdomain.com/logo.png",
-      "homeUrl": "https://yourdomain.com",
-      "imageUrl": "https://yourdomain.com/og-image.png",
-      "buttonTitle": "🧠 Play Quiz",
-      "splashImageUrl": "https://yourdomain.com/splash.png",
-      "splashBackgroundColor": "#7c3aed",
-      "webhookUrl": "https://yourdomain.com/api/webhook"
-    }
+  "accountAssociation": {
+    "header": "eyJmaWQiOjg1MDI3NSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDI2RGZDYTU4QzAwRmQ2OTY5MjBBNjM4M2MzRkEwYUE3YTg3Qjk5NGUifQ",
+    "payload": "eyJkb21haW4iOiJtaW5pYXBwLWZhcnF1aXoudmVyY2VsLmFwcCJ9",
+    "signature": "MHhjYTdlNTk5MTZjY2UzMzJhMTFlNjA0OTMwZmU4NTI3NTdjYzIwOTA4ZjgzMzg1NzA2NTg1NjA2ZWQyMjA3YzkzMWIwMWQ0ZTBlZThmZDRiNzY1Y2ZlN2QyYjIyNjVmNWEzMDdjYjM5MTlkYWIyZTRhMmQ4YzM5ZjA4MjI0ZjE4NjFj"
+  },
+  "frame": {
+    "version": "1",
+    "name": "FarQuiz",
+    "iconUrl": "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/RBv8coHVCER8/farquiz_icon-IXTBuZNFH0DudhmcvziRZArAtuvCWn.png?reUe",
+    "homeUrl": "https://miniapp-farquiz.vercel.app",
+    "imageUrl": "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/RBv8coHVCER8/farquiz_share_image-gNEfyJSjiSBnqxdOtSD4uWjQbT4mhy.png?GdgB",
+    "buttonTitle": "Take Quiz",
+    "splashImageUrl": "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/RBv8coHVCER8/farquiz_splash-h61l64V89HzQsrn3v0Ey1RJGCVtPvq.png?Ik5m",
+    "splashBackgroundColor": "#8B5CF6",
+    "webhookUrl": "https://miniapp-farquiz.vercel.app/api/webhook"
   }
+}
