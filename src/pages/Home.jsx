@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Globe, Zap, Film, Trophy, FlaskConical, BookOpen, Pizza, Brain,Monitor, Music, Bitcoin, ChevronRight, Clock, Users } from 'lucide-react';
+import { Globe, Zap, Film, Trophy, FlaskConical, BookOpen, Pizza, Brain, Monitor, Music, Bitcoin, ChevronRight, Clock, Users, AlertCircle } from 'lucide-react';
 import { useFarcasterContext } from '../context/FarcasterContext';
 import { supabase } from '../services/supabase';
 import './Home.css';
@@ -21,11 +21,20 @@ const categoryIcons = {
 
 const Home = () => {
   const navigate = useNavigate();
-  const { currentUser, isLoading: authLoading } = useFarcasterContext();
+  const { 
+    currentUser, 
+    isLoading: authLoading, 
+    isAuthenticated, 
+    error: authError,
+    isInMiniApp,
+    signIn 
+  } = useFarcasterContext();
+  
   const [categories, setCategories] = useState([]);
   const [trendingQuizzes, setTrendingQuizzes] = useState([]);
   const [featuredQuizzes, setFeaturedQuizzes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -86,23 +95,70 @@ const Home = () => {
     navigate(`/quiz/${quiz.slug}`);
   };
 
+  const handleSignIn = async () => {
+    if (!isInMiniApp) {
+      console.log('Sign in attempted outside of Farcaster context');
+      return;
+    }
+
+    setIsSigningIn(true);
+    try {
+      await signIn();
+    } catch (error) {
+      console.error('Sign in failed:', error);
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="home-loading">
         <div className="loading-spinner" />
+        <p>Loading FarQuiz...</p>
       </div>
     );
   }
 
-  if (!currentUser) {
+  // Show error state if there's an authentication error
+  if (authError) {
+    return (
+      <div className="auth-error">
+        <AlertCircle size={64} className="error-icon" />
+        <h1>Connection Error</h1>
+        <p>{authError}</p>
+        {isInMiniApp && (
+          <button 
+            className="btn btn-primary mt-4"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Show sign-in prompt if not authenticated
+  if (!isAuthenticated) {
     return (
       <div className="auth-prompt">
         <Brain size={64} className="auth-icon" />
         <h1>Welcome to FarQuiz</h1>
         <p>The Ultimate Quiz Experience on Farcaster</p>
-        <button className="btn btn-primary mt-4">
-          Sign in with Farcaster
-        </button>
+        {isInMiniApp ? (
+          <button 
+            className="btn btn-primary mt-4"
+            onClick={handleSignIn}
+            disabled={isSigningIn}
+          >
+            {isSigningIn ? 'Signing in...' : 'Sign in with Farcaster'}
+          </button>
+        ) : (
+          <div className="development-notice">
+            <p>Open this app in Farcaster to sign in</p>
+          </div>
+        )}
       </div>
     );
   }
