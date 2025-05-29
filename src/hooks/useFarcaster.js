@@ -7,6 +7,7 @@ export const useFarcaster = () => {
   const [user, setUser] = useState(null);
   const [isInMiniApp, setIsInMiniApp] = useState(false);
   const [error, setError] = useState(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
     const initializeFarcaster = async () => {
@@ -19,58 +20,25 @@ export const useFarcaster = () => {
         setIsInMiniApp(inMiniApp);
 
         if (inMiniApp) {
-          try {
-            // According to the docs, context is accessed directly as a property
-            const contextData = sdk.context;
-            console.log('Raw context data:', contextData);
+          // Wait a bit for the context to be available
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Get the context
+          const frameContext = sdk.context;
+          console.log('Frame context:', frameContext);
+          
+          if (frameContext) {
+            setContext(frameContext);
             
-            if (contextData) {
-              // Create a plain object to avoid Proxy issues
-              const plainContext = {
-                user: null,
-                client: null,
-                location: null
-              };
-
-              // Safely extract user data
-              if (contextData.user) {
-                plainContext.user = {
-                  fid: contextData.user.fid,
-                  username: contextData.user.username,
-                  displayName: contextData.user.displayName,
-                  pfpUrl: contextData.user.pfpUrl
-                };
-                console.log('Extracted user data:', plainContext.user);
-              }
-
-              // Safely extract client data
-              if (contextData.client) {
-                plainContext.client = {
-                  clientFid: contextData.client.clientFid,
-                  added: contextData.client.added,
-                  safeAreaInsets: contextData.client.safeAreaInsets,
-                  notificationDetails: contextData.client.notificationDetails
-                };
-              }
-
-              // Safely extract location data
-              if (contextData.location) {
-                plainContext.location = contextData.location;
-              }
-
-              setContext(plainContext);
-              
-              if (plainContext.user && plainContext.user.fid) {
-                setUser(plainContext.user);
-                console.log('User set successfully:', plainContext.user);
-              } else {
-                console.warn('No valid user data found in context');
-                setError('Unable to get user information from Farcaster');
-              }
+            // Set user info from context (but not authenticated yet)
+            if (frameContext.user && frameContext.user.fid) {
+              console.log('User context found:', frameContext.user);
+              setUser(frameContext.user);
+            } else {
+              console.warn('No user in context or missing FID');
             }
-          } catch (contextError) {
-            console.error('Error accessing context:', contextError);
-            setError('Failed to access Farcaster context');
+          } else {
+            console.warn('No frame context available');
           }
 
           // Hide splash screen when ready
@@ -106,40 +74,72 @@ export const useFarcaster = () => {
     initializeFarcaster();
   }, []);
 
-  const signIn = useCallback(async () => {
+  // Method 1: Using experimental quickAuth (recommended for simplicity)
+  const quickAuth = useCallback(async () => {
+    if (!isInMiniApp) {
+      throw new Error('Authentication is only available in Farcaster Mini App context');
+    }
+
+    try {
+      setIsSigningIn(true);
+      console.log('Starting quickAuth...');
+      
+      const { token } = await sdk.experimental.quickAuth();
+      console.log('QuickAuth successful, got token');
+      
+      return { token, method: 'quickAuth' };
+    } catch (error) {
+      console.error('QuickAuth failed:', error);
+      throw error;
+    } finally {
+      setIsSigningIn(false);
+    }
+  }, [isInMiniApp]);
+
+  // Method 2: Traditional SIWF flow
+  const signInWithFarcaster = useCallback(async () => {
     if (!isInMiniApp) {
       throw new Error('Sign in is only available in Farcaster Mini App context');
     }
 
     try {
+      setIsSigningIn(true);
       const nonce = generateNonce();
-      console.log('Attempting sign in with nonce:', nonce);
+      console.log('Attempting SIWF with nonce:', nonce);
       
       const result = await sdk.actions.signIn({
         nonce,
+        acceptAuthAddress: true,
       });
       
-      console.log('Sign in result:', result);
+      console.log('SIWF result:', result);
       
-      // After successful sign in, we need to re-check the context
-      const contextData = sdk.context;
-      if (contextData && contextData.user) {
-        const userData = {
-          fid: contextData.user.fid,
-          username: contextData.user.username,
-          displayName: contextData.user.displayName,
-          pfpUrl: contextData.user.pfpUrl
-        };
-        setUser(userData);
-        console.log('User updated after sign in:', userData);
-      }
-      
-      return result;
+      // Return the SIWF credential for server verification
+      return {
+        message: result.message,
+        signature: result.signature,
+        nonce,
+        method: 'siwf'
+      };
     } catch (error) {
-      console.error('Sign in failed:', error);
+      console.error('SIWF failed:', error);
       throw error;
+    } finally {
+      setIsSigningIn(false);
     }
   }, [isInMiniApp]);
+
+  // Primary sign in method (using quickAuth for simplicity)
+  const signIn = useCallback(async () => {
+    try {
+      // Try quickAuth first (simpler)
+      return await quickAuth();
+    } catch (error) {
+      console.error('QuickAuth failed, falling back to SIWF:', error);
+      // Fallback to traditional SIWF
+      return await signInWithFarcaster();
+    }
+  }, [quickAuth, signInWithFarcaster]);
 
   const shareQuiz = useCallback(async (quizData) => {
     if (!isInMiniApp) {
@@ -187,7 +187,10 @@ export const useFarcaster = () => {
     user,
     isInMiniApp,
     error,
+    isSigningIn,
     signIn,
+    quickAuth,
+    signInWithFarcaster,
     shareQuiz,
     shareResult,
   };
@@ -195,12 +198,6 @@ export const useFarcaster = () => {
 
 // Helper function to generate a nonce
 function generateNonce() {
-  const length = 32;
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    const randomIndex = Math.floor(Math.random() * charset.length);
-    result += charset[randomIndex];
-  }
-  return result;
+  return Math.random().toString(36).substring(2, 15) + 
+         Math.random().toString(36).substring(2, 15);
 }
