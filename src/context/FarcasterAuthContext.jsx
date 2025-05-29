@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { sdk } from '@farcaster/frame-sdk';
 import { verifySignInMessage } from '@farcaster/auth-kit';
-import { generateNonce } from '../utils/auth';
 
 const FarcasterAuthContext = createContext(undefined);
 
