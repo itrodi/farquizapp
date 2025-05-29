@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@farcaster/auth-kit": "^0.8.0",
     "@farcaster/frame-sdk": "^0.0.53",
+    "@farcaster/frame-wagmi-connector": "^0.0.42",
     "@supabase/supabase-js": "^2.49.8",
     "bcryptjs": "^3.0.2",
     "clsx": "^2.1.1",
@@ -18,7 +20,9 @@
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.1"
+    "react-router-dom": "^7.6.1",
+    "viem": "^2.30.5",
+    "wagmi": "^2.15.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",

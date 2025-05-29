@@ -19,24 +19,74 @@ export const useFarcaster = () => {
         setIsInMiniApp(inMiniApp);
 
         if (inMiniApp) {
-          // Wait a bit for the context to be available
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Get the context
-          const frameContext = sdk.context;
-          console.log('Frame context:', frameContext);
-          
-          if (frameContext) {
-            setContext(frameContext);
+          // The context might not be immediately available, so we need to handle it carefully
+          try {
+            // According to the docs, context is accessed directly as a property
+            // We need to be careful with how we access it due to the Proxy
+            const contextData = sdk.context;
+            console.log('Raw context data:', contextData);
             
-            if (frameContext.user && frameContext.user.fid) {
-              console.log('User found:', frameContext.user);
-              setUser(frameContext.user);
-            } else {
-              console.warn('No user in context or missing FID');
+            // Try to extract the actual values from the context
+            // The context should have user, client, and location properties
+            if (contextData) {
+              // Create a plain object to avoid Proxy issues
+              const plainContext = {
+                user: null,
+                client: null,
+                location: null
+              };
+
+              // Safely extract user data
+              try {
+                if (contextData.user) {
+                  plainContext.user = {
+                    fid: contextData.user.fid,
+                    username: contextData.user.username,
+                    displayName: contextData.user.displayName,
+                    pfpUrl: contextData.user.pfpUrl
+                  };
+                  console.log('Extracted user data:', plainContext.user);
+                }
+              } catch (e) {
+                console.error('Error extracting user data:', e);
+              }
+
+              // Safely extract client data
+              try {
+                if (contextData.client) {
+                  plainContext.client = {
+                    clientFid: contextData.client.clientFid,
+                    added: contextData.client.added,
+                    safeAreaInsets: contextData.client.safeAreaInsets,
+                    notificationDetails: contextData.client.notificationDetails
+                  };
+                }
+              } catch (e) {
+                console.error('Error extracting client data:', e);
+              }
+
+              // Safely extract location data
+              try {
+                if (contextData.location) {
+                  plainContext.location = contextData.location;
+                }
+              } catch (e) {
+                console.error('Error extracting location data:', e);
+              }
+
+              setContext(plainContext);
+              
+              if (plainContext.user && plainContext.user.fid) {
+                setUser(plainContext.user);
+                console.log('User set successfully:', plainContext.user);
+              } else {
+                console.warn('No valid user data found in context');
+                setError('Unable to get user information from Farcaster');
+              }
             }
-          } else {
-            console.warn('No frame context available');
+          } catch (contextError) {
+            console.error('Error accessing context:', contextError);
+            setError('Failed to access Farcaster context');
           }
 
           // Hide splash screen when ready
@@ -49,7 +99,6 @@ export const useFarcaster = () => {
         } else {
           console.log('Not in mini app context');
           // For development/testing outside of Farcaster
-          // You can mock user data here if needed
           if (process.env.NODE_ENV === 'development') {
             console.log('Development mode - creating mock user');
             const mockUser = {
@@ -70,7 +119,8 @@ export const useFarcaster = () => {
       }
     };
 
-    initializeFarcaster();
+    // Add a small delay to ensure the SDK is fully initialized
+    setTimeout(initializeFarcaster, 100);
   }, []);
 
   const signIn = useCallback(async () => {
@@ -88,6 +138,27 @@ export const useFarcaster = () => {
       });
       
       console.log('Sign in result:', result);
+      
+      // After successful sign in, we need to re-check the context
+      // The user data might be updated after sign in
+      setTimeout(async () => {
+        try {
+          const contextData = sdk.context;
+          if (contextData && contextData.user) {
+            const userData = {
+              fid: contextData.user.fid,
+              username: contextData.user.username,
+              displayName: contextData.user.displayName,
+              pfpUrl: contextData.user.pfpUrl
+            };
+            setUser(userData);
+            console.log('User updated after sign in:', userData);
+          }
+        } catch (e) {
+          console.error('Error updating user after sign in:', e);
+        }
+      }, 100);
+      
       return result;
     } catch (error) {
       console.error('Sign in failed:', error);

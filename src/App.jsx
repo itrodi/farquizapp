@@ -1,7 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { FarcasterProvider } from './context/FarcasterContext';
-import { AdminProvider } from './context/AdminContext';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { FarcasterAuthProvider } from './context/FarcasterAuthContext';
 
 // Pages
 import Home from './pages/Home';
@@ -34,7 +33,7 @@ function App() {
           <Route
             path="/*"
             element={
-              <FarcasterProvider>
+              <FarcasterAuthProvider>
                 <Layout>
                   <Routes>
                     <Route path="/" element={<Home />} />
@@ -46,7 +45,7 @@ function App() {
                     <Route path="/profile" element={<Profile />} />
                   </Routes>
                 </Layout>
-              </FarcasterProvider>
+              </FarcasterAuthProvider>
             }
           />
 
@@ -55,15 +54,13 @@ function App() {
           <Route
             path="/admin/*"
             element={
-              <AdminProvider>
-                <AdminLayout>
-                  <Routes>
-                    <Route path="/" element={<AdminDashboard />} />
-                    <Route path="/quizzes" element={<AdminQuizzes />} />
-                    <Route path="/analytics" element={<AdminAnalytics />} />
-                  </Routes>
-                </AdminLayout>
-              </AdminProvider>
+              <AdminLayout>
+                <Routes>
+                  <Route path="/" element={<AdminDashboard />} />
+                  <Route path="/quizzes" element={<AdminQuizzes />} />
+                  <Route path="/analytics" element={<AdminAnalytics />} />
+                </Routes>
+              </AdminLayout>
             }
           />
         </Routes>
