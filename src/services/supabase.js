@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Access environment variables properly in React
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+// Access environment variables properly in Vite
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Fallback for development - you can remove this in production
 const defaultUrl = supabaseUrl || 'YOUR_SUPABASE_URL_HERE';
@@ -10,7 +10,7 @@ const defaultAnonKey = supabaseAnonKey || 'YOUR_SUPABASE_ANON_KEY_HERE';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
-  console.log('Make sure you have REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in your .env file');
+  console.log('Make sure you have VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file');
 }
 
 export const supabase = createClient(defaultUrl, defaultAnonKey, {

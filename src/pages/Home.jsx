@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Globe, Zap, Film, Trophy, FlaskConical, BookOpen, Pizza, Monitor, Music, Bitcoin, ChevronRight, Clock, Users } from 'lucide-react';
+import { Globe, Zap, Film, Trophy, FlaskConical, BookOpen, Pizza, Brain,Monitor, Music, Bitcoin, ChevronRight, Clock, Users } from 'lucide-react';
 import { useFarcasterContext } from '../context/FarcasterContext';
 import { supabase } from '../services/supabase';
 import './Home.css';
