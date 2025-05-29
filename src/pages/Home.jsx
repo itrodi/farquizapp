@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Brain, AlertCircle } from 'lucide-react';
 import { useFarcasterAuth } from '../context/FarcasterAuthContext';
@@ -6,6 +6,7 @@ import './Home.css';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const { 
     isAuthenticated, 
     user, 
@@ -13,6 +14,19 @@ const Home = () => {
     error, 
     signIn 
   } = useFarcasterAuth();
+
+  const handleSignIn = async () => {
+    if (isSigningIn) return;
+    
+    setIsSigningIn(true);
+    try {
+      await signIn();
+    } catch (err) {
+      console.error('Sign in error:', err);
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -49,9 +63,10 @@ const Home = () => {
         <p>The Ultimate Quiz Experience on Farcaster</p>
         <button 
           className="btn btn-primary mt-4"
-          onClick={signIn}
+          onClick={handleSignIn}
+          disabled={isSigningIn}
         >
-          Sign in with Farcaster
+          {isSigningIn ? 'Signing in...' : 'Sign in with Farcaster'}
         </button>
       </div>
     );

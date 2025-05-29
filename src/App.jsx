@@ -27,13 +27,13 @@ import './App.css';
 function App() {
   return (
     <Router>
-      <div className="App">
-        <Routes>
-          {/* Main App Routes */}
-          <Route
-            path="/*"
-            element={
-              <FarcasterAuthProvider>
+      <FarcasterAuthProvider>
+        <div className="App">
+          <Routes>
+            {/* Main App Routes */}
+            <Route
+              path="/*"
+              element={
                 <Layout>
                   <Routes>
                     <Route path="/" element={<Home />} />
@@ -45,26 +45,26 @@ function App() {
                     <Route path="/profile" element={<Profile />} />
                   </Routes>
                 </Layout>
-              </FarcasterAuthProvider>
-            }
-          />
+              }
+            />
 
-          {/* Admin Routes */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route
-            path="/admin/*"
-            element={
-              <AdminLayout>
-                <Routes>
-                  <Route path="/" element={<AdminDashboard />} />
-                  <Route path="/quizzes" element={<AdminQuizzes />} />
-                  <Route path="/analytics" element={<AdminAnalytics />} />
-                </Routes>
-              </AdminLayout>
-            }
-          />
-        </Routes>
-      </div>
+            {/* Admin Routes */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route
+              path="/admin/*"
+              element={
+                <AdminLayout>
+                  <Routes>
+                    <Route path="/" element={<AdminDashboard />} />
+                    <Route path="/quizzes" element={<AdminQuizzes />} />
+                    <Route path="/analytics" element={<AdminAnalytics />} />
+                  </Routes>
+                </AdminLayout>
+              }
+            />
+          </Routes>
+        </div>
+      </FarcasterAuthProvider>
     </Router>
   );
 }

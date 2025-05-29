@@ -19,15 +19,11 @@ export const useFarcaster = () => {
         setIsInMiniApp(inMiniApp);
 
         if (inMiniApp) {
-          // The context might not be immediately available, so we need to handle it carefully
           try {
             // According to the docs, context is accessed directly as a property
-            // We need to be careful with how we access it due to the Proxy
             const contextData = sdk.context;
             console.log('Raw context data:', contextData);
             
-            // Try to extract the actual values from the context
-            // The context should have user, client, and location properties
             if (contextData) {
               // Create a plain object to avoid Proxy issues
               const plainContext = {
@@ -37,41 +33,29 @@ export const useFarcaster = () => {
               };
 
               // Safely extract user data
-              try {
-                if (contextData.user) {
-                  plainContext.user = {
-                    fid: contextData.user.fid,
-                    username: contextData.user.username,
-                    displayName: contextData.user.displayName,
-                    pfpUrl: contextData.user.pfpUrl
-                  };
-                  console.log('Extracted user data:', plainContext.user);
-                }
-              } catch (e) {
-                console.error('Error extracting user data:', e);
+              if (contextData.user) {
+                plainContext.user = {
+                  fid: contextData.user.fid,
+                  username: contextData.user.username,
+                  displayName: contextData.user.displayName,
+                  pfpUrl: contextData.user.pfpUrl
+                };
+                console.log('Extracted user data:', plainContext.user);
               }
 
               // Safely extract client data
-              try {
-                if (contextData.client) {
-                  plainContext.client = {
-                    clientFid: contextData.client.clientFid,
-                    added: contextData.client.added,
-                    safeAreaInsets: contextData.client.safeAreaInsets,
-                    notificationDetails: contextData.client.notificationDetails
-                  };
-                }
-              } catch (e) {
-                console.error('Error extracting client data:', e);
+              if (contextData.client) {
+                plainContext.client = {
+                  clientFid: contextData.client.clientFid,
+                  added: contextData.client.added,
+                  safeAreaInsets: contextData.client.safeAreaInsets,
+                  notificationDetails: contextData.client.notificationDetails
+                };
               }
 
               // Safely extract location data
-              try {
-                if (contextData.location) {
-                  plainContext.location = contextData.location;
-                }
-              } catch (e) {
-                console.error('Error extracting location data:', e);
+              if (contextData.location) {
+                plainContext.location = contextData.location;
               }
 
               setContext(plainContext);
@@ -119,8 +103,7 @@ export const useFarcaster = () => {
       }
     };
 
-    // Add a small delay to ensure the SDK is fully initialized
-    setTimeout(initializeFarcaster, 100);
+    initializeFarcaster();
   }, []);
 
   const signIn = useCallback(async () => {
@@ -134,30 +117,22 @@ export const useFarcaster = () => {
       
       const result = await sdk.actions.signIn({
         nonce,
-        acceptAuthAddress: true,
       });
       
       console.log('Sign in result:', result);
       
       // After successful sign in, we need to re-check the context
-      // The user data might be updated after sign in
-      setTimeout(async () => {
-        try {
-          const contextData = sdk.context;
-          if (contextData && contextData.user) {
-            const userData = {
-              fid: contextData.user.fid,
-              username: contextData.user.username,
-              displayName: contextData.user.displayName,
-              pfpUrl: contextData.user.pfpUrl
-            };
-            setUser(userData);
-            console.log('User updated after sign in:', userData);
-          }
-        } catch (e) {
-          console.error('Error updating user after sign in:', e);
-        }
-      }, 100);
+      const contextData = sdk.context;
+      if (contextData && contextData.user) {
+        const userData = {
+          fid: contextData.user.fid,
+          username: contextData.user.username,
+          displayName: contextData.user.displayName,
+          pfpUrl: contextData.user.pfpUrl
+        };
+        setUser(userData);
+        console.log('User updated after sign in:', userData);
+      }
       
       return result;
     } catch (error) {
@@ -220,6 +195,12 @@ export const useFarcaster = () => {
 
 // Helper function to generate a nonce
 function generateNonce() {
-  return Math.random().toString(36).substring(2, 15) + 
-         Math.random().toString(36).substring(2, 15);
+  const length = 32;
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * charset.length);
+    result += charset[randomIndex];
+  }
+  return result;
 }
