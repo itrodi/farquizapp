@@ -1,6 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import { sdk } from '@farcaster/frame-sdk';
 
+// Helper functions to safely convert proxy values to primitives
+const safePrimitiveConversion = (value, defaultValue = '') => {
+  if (value === null || value === undefined) return defaultValue;
+  try {
+    return String(value);
+  } catch (error) {
+    console.warn('Failed to convert value to string:', error);
+    return defaultValue;
+  }
+};
+
+const safeNumberConversion = (value, defaultValue = 0) => {
+  if (value === null || value === undefined) return defaultValue;
+  try {
+    const num = Number(value);
+    return isNaN(num) ? defaultValue : num;
+  } catch (error) {
+    console.warn('Failed to convert value to number:', error);
+    return defaultValue;
+  }
+};
+
 export const useFarcaster = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [context, setContext] = useState(null);
@@ -33,7 +55,17 @@ export const useFarcaster = () => {
             // Set user info from context (but not authenticated yet)
             if (frameContext.user && frameContext.user.fid) {
               console.log('User context found:', frameContext.user);
-              setUser(frameContext.user);
+              
+              // Safely extract user data and convert proxy values to primitives
+              const userData = {
+                fid: safeNumberConversion(frameContext.user.fid),
+                username: safePrimitiveConversion(frameContext.user.username),
+                displayName: safePrimitiveConversion(frameContext.user.displayName),
+                pfpUrl: safePrimitiveConversion(frameContext.user.pfpUrl)
+              };
+              
+              console.log('Extracted user data:', userData);
+              setUser(userData);
             } else {
               console.warn('No user in context or missing FID');
             }

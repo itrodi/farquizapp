@@ -18,6 +18,28 @@ export const useFarcasterContext = () => {
   return context;
 };
 
+// Helper function to safely convert proxy values to primitives
+const safePrimitiveConversion = (value, defaultValue = '') => {
+  if (value === null || value === undefined) return defaultValue;
+  try {
+    return String(value);
+  } catch (error) {
+    console.warn('Failed to convert value to string:', error);
+    return defaultValue;
+  }
+};
+
+const safeNumberConversion = (value, defaultValue = 0) => {
+  if (value === null || value === undefined) return defaultValue;
+  try {
+    const num = Number(value);
+    return isNaN(num) ? defaultValue : num;
+  } catch (error) {
+    console.warn('Failed to convert value to number:', error);
+    return defaultValue;
+  }
+};
+
 export const FarcasterProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -47,12 +69,16 @@ export const FarcasterProvider = ({ children }) => {
           console.log('SDK Context:', context);
           
           if (context?.user) {
-            setContextUser({
-              fid: context.user.fid,
-              username: context.user.username,
-              displayName: context.user.displayName,
-              pfpUrl: context.user.pfpUrl
-            });
+            // Safely extract user data and convert proxy values to primitives
+            const userData = {
+              fid: safeNumberConversion(context.user.fid),
+              username: safePrimitiveConversion(context.user.username),
+              displayName: safePrimitiveConversion(context.user.displayName),
+              pfpUrl: safePrimitiveConversion(context.user.pfpUrl)
+            };
+            
+            console.log('Extracted user data:', userData);
+            setContextUser(userData);
           }
 
           // Check for existing auth session

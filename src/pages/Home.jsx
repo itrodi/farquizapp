@@ -115,6 +115,37 @@ const Home = () => {
     }
   };
 
+  // Helper function to safely get avatar URL
+  const getAvatarUrl = (user) => {
+    if (!user) return null;
+    
+    const url = user.pfpUrl || user.pfp_url;
+    
+    if (url && typeof url === 'string' && url.trim() !== '') {
+      return url.trim();
+    }
+    
+    return null;
+  };
+
+  // Helper function to get avatar placeholder
+  const getAvatarPlaceholder = (user) => {
+    if (!user) return 'U';
+    
+    const displayName = user.displayName || user.display_name;
+    const username = user.username;
+    
+    if (displayName && typeof displayName === 'string' && displayName.trim()) {
+      return displayName.trim().charAt(0).toUpperCase();
+    }
+    
+    if (username && typeof username === 'string' && username.trim()) {
+      return username.trim().charAt(0).toUpperCase();
+    }
+    
+    return 'U';
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="home-loading">
@@ -143,6 +174,11 @@ const Home = () => {
 
   // Show sign-in prompt if not authenticated
   if (!isAuthenticated) {
+    const avatarUrl = getAvatarUrl(contextUser);
+    const avatarPlaceholder = getAvatarPlaceholder(contextUser);
+    const displayName = contextUser?.displayName || contextUser?.display_name;
+    const username = contextUser?.username;
+
     return (
       <div className="auth-prompt">
         <FrameMeta type="home" />
@@ -153,20 +189,26 @@ const Home = () => {
         {contextUser && (
           <div className="user-preview">
             <div className="user-info">
-              {contextUser.pfpUrl ? (
+              {avatarUrl ? (
                 <img 
-                  src={contextUser.pfpUrl} 
-                  alt={contextUser.username}
+                  src={avatarUrl} 
+                  alt={username || 'User'}
                   className="preview-avatar"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
                 />
-              ) : (
-                <div className="preview-avatar-placeholder">
-                  {contextUser.username?.[0]?.toUpperCase() || 'U'}
-                </div>
-              )}
+              ) : null}
+              <div 
+                className="preview-avatar-placeholder"
+                style={{ display: avatarUrl ? 'none' : 'flex' }}
+              >
+                {avatarPlaceholder}
+              </div>
               <div className="user-details">
-                <h3>{contextUser.displayName || contextUser.username}</h3>
-                <p>@{contextUser.username}</p>
+                <h3>{displayName || username}</h3>
+                <p>@{username}</p>
               </div>
             </div>
           </div>
@@ -214,7 +256,7 @@ const Home = () => {
       <div className="hero-section">
         <div className="hero-content">
           <Brain size={48} className="hero-icon" />
-          <h1>Welcome back, {currentUser.display_name || currentUser.username}!</h1>
+          <h1>Welcome back, {currentUser?.display_name || currentUser?.username}!</h1>
           <p>Ready for your next challenge?</p>
         </div>
         <button 
