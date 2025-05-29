@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { FarcasterAuthProvider } from './context/FarcasterAuthContext';
+import { FarcasterProvider } from './context/FarcasterContext';
+import { AdminProvider } from './context/AdminContext';
 
 // Pages
 import Home from './pages/Home';
@@ -27,7 +28,7 @@ import './App.css';
 function App() {
   return (
     <Router>
-      <FarcasterAuthProvider>
+      <FarcasterProvider>
         <div className="App">
           <Routes>
             {/* Main App Routes */}
@@ -53,18 +54,20 @@ function App() {
             <Route
               path="/admin/*"
               element={
-                <AdminLayout>
-                  <Routes>
-                    <Route path="/" element={<AdminDashboard />} />
-                    <Route path="/quizzes" element={<AdminQuizzes />} />
-                    <Route path="/analytics" element={<AdminAnalytics />} />
-                  </Routes>
-                </AdminLayout>
+                <AdminProvider>
+                  <AdminLayout>
+                    <Routes>
+                      <Route path="/" element={<AdminDashboard />} />
+                      <Route path="/quizzes" element={<AdminQuizzes />} />
+                      <Route path="/analytics" element={<AdminAnalytics />} />
+                    </Routes>
+                  </AdminLayout>
+                </AdminProvider>
               }
             />
           </Routes>
         </div>
-      </FarcasterAuthProvider>
+      </FarcasterProvider>
     </Router>
   );
 }

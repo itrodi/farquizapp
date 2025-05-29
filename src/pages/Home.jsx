@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Globe, Zap, Film, Trophy, FlaskConical, BookOpen, Pizza, Brain, Monitor, Music, Bitcoin, ChevronRight, Clock, Users, AlertCircle, LogIn } from 'lucide-react';
 import { useFarcasterContext } from '../context/FarcasterContext';
 import { supabase } from '../services/supabase';
+import FrameMeta from '../components/FrameMeta';
 import './Home.css';
 
 // Category icons mapping
@@ -27,7 +28,7 @@ const Home = () => {
     isAuthenticated, 
     error: authError,
     isInMiniApp,
-    user: contextUser,
+    contextUser,
     signIn,
     isSigningIn
   } = useFarcasterContext();
@@ -98,7 +99,7 @@ const Home = () => {
 
   const handleSignIn = async () => {
     if (!isInMiniApp) {
-      console.log('Sign in attempted outside of Farcaster context');
+      console.log('Sign in is only available in Farcaster Mini App');
       return;
     }
 
@@ -124,20 +125,18 @@ const Home = () => {
   }
 
   // Show error state if there's an authentication error
-  if (authError) {
+  if (authError && isInMiniApp) {
     return (
       <div className="auth-error">
         <AlertCircle size={64} className="error-icon" />
         <h1>Connection Error</h1>
         <p>{authError}</p>
-        {isInMiniApp && (
-          <button 
-            className="btn btn-primary mt-4"
-            onClick={() => window.location.reload()}
-          >
-            Try Again
-          </button>
-        )}
+        <button 
+          className="btn btn-primary mt-4"
+          onClick={() => window.location.reload()}
+        >
+          Try Again
+        </button>
       </div>
     );
   }
@@ -146,6 +145,7 @@ const Home = () => {
   if (!isAuthenticated) {
     return (
       <div className="auth-prompt">
+        <FrameMeta type="home" />
         <Brain size={64} className="auth-icon" />
         <h1>Welcome to FarQuiz</h1>
         <p>The Ultimate Quiz Experience on Farcaster</p>
@@ -184,7 +184,7 @@ const Home = () => {
         ) : (
           <div className="development-notice">
             <p>Open this app in Farcaster to sign in</p>
-            <small>Or running in development mode</small>
+            <small>Currently in development mode</small>
           </div>
         )}
         
@@ -208,6 +208,8 @@ const Home = () => {
 
   return (
     <div className="home-page">
+      <FrameMeta type="home" />
+      
       {/* Hero Section */}
       <div className="hero-section">
         <div className="hero-content">

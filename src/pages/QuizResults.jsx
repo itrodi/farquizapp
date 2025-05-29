@@ -5,12 +5,13 @@ import { useFarcasterContext } from '../context/FarcasterContext';
 import { supabase } from '../services/supabase';
 import { formatTimeDisplay, getResultColor, getResultMessage, getOrdinalSuffix } from '../utils/helpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import FrameMeta from '../components/FrameMeta';
 import './QuizResults.css';
 
 const QuizResults = () => {
   const { quizSlug, attemptId } = useParams();
   const navigate = useNavigate();
-  const { currentUser, shareResult } = useFarcasterContext();
+  const { currentUser, shareResult, isInMiniApp } = useFarcasterContext();
   
   const [attempt, setAttempt] = useState(null);
   const [quiz, setQuiz] = useState(null);
@@ -89,9 +90,11 @@ const QuizResults = () => {
       await shareResult({
         quizTitle: quiz.title,
         quizSlug: quiz.slug,
-        percentage: attempt.percentage,
+        percentage: Math.round(attempt.percentage),
         timeFormatted: formatTimeDisplay(attempt.time_taken),
-        position: leaderboardPosition
+        timeTaken: attempt.time_taken,
+        position: leaderboardPosition,
+        username: currentUser.username || currentUser.display_name
       });
     } catch (error) {
       console.error('Error sharing result:', error);
@@ -119,8 +122,19 @@ const QuizResults = () => {
   const resultColor = getResultColor(attempt.percentage);
   const resultMessage = getResultMessage(attempt.percentage);
 
+  // Frame meta data
+  const frameMetaData = {
+    quizTitle: quiz.title,
+    quizSlug: quiz.slug,
+    percentage: Math.round(attempt.percentage),
+    username: currentUser?.username || currentUser?.display_name || 'Player'
+  };
+
   return (
     <div className="quiz-results-page">
+      {/* Add Frame Meta for embeds */}
+      <FrameMeta type="result" data={frameMetaData} />
+      
       {/* Results Header */}
       <div className="results-header" style={{ borderColor: resultColor }}>
         <div className="score-circle" style={{ borderColor: resultColor }}>
@@ -169,14 +183,16 @@ const QuizResults = () => {
 
       {/* Action Buttons */}
       <div className="action-buttons">
-        <button 
-          className="btn btn-primary"
-          onClick={handleShareResult}
-          disabled={isSharing}
-        >
-          <Share2 size={20} />
-          Share Result
-        </button>
+        {isInMiniApp && (
+          <button 
+            className="btn btn-primary"
+            onClick={handleShareResult}
+            disabled={isSharing}
+          >
+            <Share2 size={20} />
+            Share Result
+          </button>
+        )}
 
         <button 
           className="btn btn-secondary"

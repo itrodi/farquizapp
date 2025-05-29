@@ -70,26 +70,41 @@ export const shareResultAsFrame = async (sdk, resultData) => {
 };
 
 /**
- * Generate frame preview data
+ * Generate frame metadata for a quiz
  */
-export const generateFramePreview = (type, data) => {
-  if (type === 'quiz') {
-    return {
-      title: data.title,
-      description: data.description || `Test your knowledge with this ${data.difficulty} quiz!`,
-      image: `${APP_URL}/api/og/quiz?title=${encodeURIComponent(data.title)}&emoji=${data.emoji || '🎯'}`,
-      button: '🧠 Take Quiz',
-    };
-  }
+export const generateQuizFrameData = (quiz) => {
+  return {
+    version: "next",
+    imageUrl: `${APP_URL}/api/og/quiz?title=${encodeURIComponent(quiz.title)}&emoji=${encodeURIComponent(quiz.emoji || '🎯')}&category=${encodeURIComponent(quiz.category?.name || 'Quiz')}&difficulty=${quiz.difficulty}&questions=${quiz.total_questions || quiz.questions?.length || 0}`,
+    button: {
+      title: "🧠 Take Quiz",
+      action: {
+        type: "launch_frame",
+        url: `${APP_URL}/quiz/${quiz.slug}`,
+        name: "FarQuiz",
+        splashImageUrl: "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/RBv8coHVCER8/farquiz_splash-h61l64V89HzQsrn3v0Ey1RJGCVtPvq.png",
+        splashBackgroundColor: "#8B5CF6"
+      }
+    }
+  };
+};
 
-  if (type === 'result') {
-    return {
-      title: `${data.username} scored ${data.percentage}% on ${data.quizTitle}`,
-      description: 'Can you beat their score?',
-      image: `${APP_URL}/api/og/result?score=${data.percentage}&title=${encodeURIComponent(data.quizTitle)}`,
-      button: '🏆 Beat My Score',
-    };
-  }
-
-  return null;
+/**
+ * Generate frame metadata for quiz results
+ */
+export const generateResultFrameData = (result) => {
+  return {
+    version: "next",
+    imageUrl: `${APP_URL}/api/og/result?score=${result.percentage}&title=${encodeURIComponent(result.quizTitle)}&time=${result.timeTaken || 0}&username=${encodeURIComponent(result.username || 'Player')}`,
+    button: {
+      title: "🏆 Beat My Score",
+      action: {
+        type: "launch_frame",
+        url: `${APP_URL}/quiz/${result.quizSlug}`,
+        name: "FarQuiz",
+        splashImageUrl: "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/RBv8coHVCER8/farquiz_splash-h61l64V89HzQsrn3v0Ey1RJGCVtPvq.png",
+        splashBackgroundColor: "#8B5CF6"
+      }
+    }
+  };
 };

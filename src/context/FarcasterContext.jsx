@@ -1,13 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useFarcaster } from '../hooks/useFarcaster';
+import { sdk } from '@farcaster/frame-sdk';
 import { supabase, setCurrentUserFid } from '../services/supabase';
 import {
-  extractUserFromQuickAuth,
+  parseJwt,
   storeAuthData,
   getStoredAuthData,
   clearAuthData,
-  isAuthenticated as checkAuthenticated,
-  formatUserDisplayName
 } from '../utils/auth';
 
 const FarcasterContext = createContext({});
@@ -21,95 +19,103 @@ export const useFarcasterContext = () => {
 };
 
 export const FarcasterProvider = ({ children }) => {
-  const farcaster = useFarcaster();
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [contextUser, setContextUser] = useState(null);
+  const [isInMiniApp, setIsInMiniApp] = useState(false);
 
   useEffect(() => {
-    const initializeUser = async () => {
-      console.log('Initializing user...', { 
-        isLoaded: farcaster.isLoaded, 
-        user: farcaster.user,
-        isInMiniApp: farcaster.isInMiniApp 
-      });
+    const initializeApp = async () => {
+      try {
+        console.log('Initializing FarQuiz app...');
+        
+        // Check if we're in a mini app
+        const inMiniApp = await sdk.isInMiniApp();
+        console.log('Is in Mini App:', inMiniApp);
+        setIsInMiniApp(inMiniApp);
 
-      if (farcaster.isLoaded) {
-        try {
-          setError(null);
+        if (inMiniApp) {
+          // Wait for context to be available
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Get context from SDK
+          const context = sdk.context;
+          console.log('SDK Context:', context);
+          
+          if (context?.user) {
+            setContextUser({
+              fid: context.user.fid,
+              username: context.user.username,
+              displayName: context.user.displayName,
+              pfpUrl: context.user.pfpUrl
+            });
+          }
 
           // Check for existing auth session
           const storedAuth = getStoredAuthData();
-          if (storedAuth) {
+          if (storedAuth && !isTokenExpired(storedAuth.token)) {
             console.log('Found valid stored auth session');
-            setAuthToken(storedAuth.token);
             await loadUserFromAuth(storedAuth);
-            setIsLoading(false);
-            return;
           }
 
-          // If we have user context from Farcaster but no auth session,
-          // we need the user to explicitly sign in
-          if (farcaster.user && farcaster.user.fid) {
-            console.log('User context available but not authenticated');
-            // Don't auto-authenticate, wait for explicit sign in
-          } else if (!farcaster.isInMiniApp) {
-            // Development mode
-            if (process.env.NODE_ENV === 'development') {
-              console.log('Development mode - mock authentication');
-              setCurrentUser({
-                id: 'mock-id',
-                fid: 12345,
-                username: 'testuser',
-                display_name: 'Test User',
-                pfp_url: ''
-              });
-              setIsAuthenticated(true);
-            }
+          // Hide splash screen
+          await sdk.actions.ready();
+        } else {
+          // Development mode
+          console.log('Running in development mode');
+          if (process.env.NODE_ENV === 'development') {
+            setContextUser({
+              fid: 12345,
+              username: 'testuser',
+              displayName: 'Test User',
+              pfpUrl: ''
+            });
           }
-        } catch (error) {
-          console.error('Error initializing user:', error);
-          setError('Failed to initialize user session');
         }
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        setError('Failed to initialize app');
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     };
 
-    initializeUser();
-  }, [farcaster.isLoaded, farcaster.user, farcaster.isInMiniApp]);
+    initializeApp();
+  }, []);
+
+  const isTokenExpired = (token) => {
+    try {
+      const payload = parseJwt(token);
+      if (!payload || !payload.exp) return true;
+      return payload.exp * 1000 < Date.now();
+    } catch {
+      return true;
+    }
+  };
 
   const loadUserFromAuth = async (authData) => {
     try {
-      // If using QuickAuth, decode the JWT to get user info
-      if (authData.method === 'quickAuth' && authData.token) {
-        const userInfo = extractUserFromQuickAuth(authData.token);
-        if (userInfo && userInfo.fid) {
-          console.log('QuickAuth user info:', userInfo);
-          
-          // Load or create user based on FID
-          await loadOrCreateUser(userInfo.fid, {
-            fid: userInfo.fid,
-            username: farcaster.user?.username || `user${userInfo.fid}`,
-            display_name: farcaster.user?.displayName || '',
-            pfp_url: farcaster.user?.pfpUrl || ''
-          });
-          
-          setIsAuthenticated(true);
-          return;
-        }
+      const payload = parseJwt(authData.token);
+      if (!payload || !payload.sub) {
+        throw new Error('Invalid token');
       }
 
-      // If using SIWF, we would verify the signature here
-      if (authData.method === 'siwf') {
-        // For now, just use the context user data
-        if (farcaster.user?.fid) {
-          await loadOrCreateUser(farcaster.user.fid, farcaster.user);
-          setIsAuthenticated(true);
-        }
-      }
+      const fid = typeof payload.sub === 'string' ? parseInt(payload.sub) : payload.sub;
+      
+      // Load or create user in database
+      await loadOrCreateUser(fid, {
+        fid,
+        username: contextUser?.username || `user${fid}`,
+        display_name: contextUser?.displayName || '',
+        pfp_url: contextUser?.pfpUrl || ''
+      });
+
+      setAuthToken(authData.token);
+      setIsAuthenticated(true);
     } catch (error) {
       console.error('Error loading user from auth:', error);
       clearAuthData();
@@ -119,6 +125,9 @@ export const FarcasterProvider = ({ children }) => {
 
   const loadOrCreateUser = async (fid, userData) => {
     try {
+      // Set the FID for RLS
+      await setCurrentUserFid(fid);
+
       // Check if user exists
       const { data: existingUser, error: fetchError } = await supabase
         .from('users')
@@ -132,7 +141,6 @@ export const FarcasterProvider = ({ children }) => {
 
       let user = existingUser;
 
-      // Create user if doesn't exist
       if (!existingUser) {
         console.log('Creating new user for FID:', fid);
         
@@ -141,20 +149,40 @@ export const FarcasterProvider = ({ children }) => {
           .insert({
             fid: fid,
             username: userData.username || `user${fid}`,
-            display_name: userData.displayName || userData.display_name || '',
-            pfp_url: userData.pfpUrl || userData.pfp_url || '',
+            display_name: userData.display_name || '',
+            pfp_url: userData.pfp_url || '',
           })
           .select()
           .single();
 
         if (createError) throw createError;
         user = newUser;
+      } else {
+        // Update user info if changed
+        const updates = {};
+        if (userData.username && userData.username !== existingUser.username) {
+          updates.username = userData.username;
+        }
+        if (userData.display_name && userData.display_name !== existingUser.display_name) {
+          updates.display_name = userData.display_name;
+        }
+        if (userData.pfp_url && userData.pfp_url !== existingUser.pfp_url) {
+          updates.pfp_url = userData.pfp_url;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          const { data: updatedUser } = await supabase
+            .from('users')
+            .update(updates)
+            .eq('id', existingUser.id)
+            .select()
+            .single();
+          
+          if (updatedUser) user = updatedUser;
+        }
       }
 
-      // Set RLS context
-      await setCurrentUserFid(fid);
       setCurrentUser(user);
-      
     } catch (error) {
       console.error('Error loading/creating user:', error);
       throw error;
@@ -162,33 +190,70 @@ export const FarcasterProvider = ({ children }) => {
   };
 
   const signIn = async () => {
+    if (!isInMiniApp) {
+      setError('Sign in is only available in Farcaster');
+      return { success: false, error: 'Not in Farcaster context' };
+    }
+
     try {
       setError(null);
+      setIsSigningIn(true);
       console.log('Starting sign in process...');
-      
-      const authResult = await farcaster.signIn();
-      console.log('Auth result:', authResult);
 
-      // Store the auth data
+      // Use QuickAuth for simpler authentication
+      const { token } = await sdk.experimental.quickAuth();
+      console.log('QuickAuth successful');
+
       const authData = {
-        ...authResult,
-        expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
+        token,
+        method: 'quickAuth',
         timestamp: Date.now()
       };
 
+      // Store auth data
       storeAuthData(authData);
-      setAuthToken(authResult.token || 'authenticated');
-
-      // Load user data
+      
+      // Load user from auth
       await loadUserFromAuth(authData);
 
       console.log('Sign in completed successfully');
       return { success: true };
-      
     } catch (error) {
       console.error('Sign in error:', error);
-      setError(error.message || 'Failed to sign in');
-      return { success: false, error: error.message };
+      
+      // If QuickAuth fails, try traditional SIWF
+      try {
+        console.log('Falling back to SIWF...');
+        const nonce = generateNonce();
+        const result = await sdk.actions.signIn({
+          nonce,
+          acceptAuthAddress: true,
+        });
+
+        const authData = {
+          message: result.message,
+          signature: result.signature,
+          nonce,
+          method: 'siwf',
+          timestamp: Date.now()
+        };
+
+        storeAuthData(authData);
+        
+        // For SIWF, we'll use context user data
+        if (contextUser?.fid) {
+          await loadOrCreateUser(contextUser.fid, contextUser);
+          setIsAuthenticated(true);
+        }
+
+        return { success: true };
+      } catch (siwfError) {
+        console.error('SIWF also failed:', siwfError);
+        setError('Failed to sign in');
+        return { success: false, error: siwfError.message };
+      }
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
@@ -198,6 +263,46 @@ export const FarcasterProvider = ({ children }) => {
     setIsAuthenticated(false);
     setAuthToken(null);
     setError(null);
+  };
+
+  const shareQuiz = async (quizData) => {
+    if (!isInMiniApp) {
+      throw new Error('Sharing is only available in Farcaster');
+    }
+
+    try {
+      const { shareQuizAsFrame } = await import('../services/farcaster/sharing');
+      const result = await shareQuizAsFrame(sdk, quizData);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to share quiz');
+      }
+      
+      return result.cast;
+    } catch (error) {
+      console.error('Share failed:', error);
+      throw error;
+    }
+  };
+
+  const shareResult = async (resultData) => {
+    if (!isInMiniApp) {
+      throw new Error('Sharing is only available in Farcaster');
+    }
+
+    try {
+      const { shareResultAsFrame } = await import('../services/farcaster/sharing');
+      const result = await shareResultAsFrame(sdk, resultData);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to share result');
+      }
+      
+      return result.cast;
+    } catch (error) {
+      console.error('Share failed:', error);
+      throw error;
+    }
   };
 
   const refreshUser = async () => {
@@ -219,20 +324,20 @@ export const FarcasterProvider = ({ children }) => {
   };
 
   const value = {
-    // Spread all farcaster properties
-    ...farcaster,
-    // Override/add our custom properties
     currentUser,
     isAuthenticated,
     isLoading,
     error,
     authToken,
+    isSigningIn,
+    contextUser,
+    isInMiniApp,
+    user: contextUser,
     signIn,
     signOut,
     refreshUser,
-    // Keep the sharing functions from farcaster
-    shareQuiz: farcaster.shareQuiz,
-    shareResult: farcaster.shareResult,
+    shareQuiz,
+    shareResult,
   };
 
   return (
@@ -241,3 +346,8 @@ export const FarcasterProvider = ({ children }) => {
     </FarcasterContext.Provider>
   );
 };
+
+function generateNonce() {
+  return Math.random().toString(36).substring(2, 15) + 
+         Math.random().toString(36).substring(2, 15);
+}

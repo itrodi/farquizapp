@@ -6,12 +6,13 @@ import { fetchQuizBySlug, fetchUserQuizAttempts, fetchQuizLeaderboard } from '..
 import { formatTimeDisplay, getOrdinalSuffix } from '../utils/helpers';
 import MiniLeaderboard from '../components/leaderboard/MiniLeaderboard';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import FrameMeta from '../components/FrameMeta';
 import './QuizPreview.css';
 
 const QuizPreview = () => {
   const { quizSlug } = useParams();
   const navigate = useNavigate();
-  const { currentUser, shareQuiz } = useFarcasterContext();
+  const { currentUser, isAuthenticated, shareQuiz, isInMiniApp } = useFarcasterContext();
   
   const [quiz, setQuiz] = useState(null);
   const [userAttempts, setUserAttempts] = useState([]);
@@ -54,8 +55,8 @@ const QuizPreview = () => {
   };
 
   const handleStartQuiz = () => {
-    if (!currentUser) {
-      // Prompt to sign in
+    if (!isAuthenticated) {
+      // Show sign in prompt
       return;
     }
     navigate(`/quiz/${quizSlug}/play`);
@@ -70,7 +71,9 @@ const QuizPreview = () => {
         title: quiz.title,
         slug: quiz.slug,
         description: quiz.description,
-        emoji: quiz.emoji
+        emoji: quiz.emoji,
+        difficulty: quiz.difficulty,
+        category: quiz.category
       });
     } catch (error) {
       console.error('Error sharing quiz:', error);
@@ -108,6 +111,9 @@ const QuizPreview = () => {
 
   return (
     <div className="quiz-preview-page">
+      {/* Add Frame Meta for embeds */}
+      <FrameMeta type="quiz" data={quiz} />
+      
       {/* Quiz Header */}
       <div className="quiz-preview-header">
         <div className="quiz-emoji-container">
@@ -155,19 +161,22 @@ const QuizPreview = () => {
         <button 
           className="btn btn-primary btn-start"
           onClick={handleStartQuiz}
+          disabled={!isAuthenticated}
         >
           <Play size={20} />
-          {bestAttempt ? 'Play Again' : 'Start Quiz'}
+          {!isAuthenticated ? 'Sign in to Play' : (bestAttempt ? 'Play Again' : 'Start Quiz')}
         </button>
         
-        <button 
-          className="btn btn-secondary btn-share"
-          onClick={handleShareQuiz}
-          disabled={isSharing}
-        >
-          <Share2 size={20} />
-          Share Quiz
-        </button>
+        {isInMiniApp && (
+          <button 
+            className="btn btn-secondary btn-share"
+            onClick={handleShareQuiz}
+            disabled={isSharing || !isAuthenticated}
+          >
+            <Share2 size={20} />
+            Share Quiz
+          </button>
+        )}
       </div>
 
       {/* Quiz Info */}
