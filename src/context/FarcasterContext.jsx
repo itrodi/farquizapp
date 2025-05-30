@@ -42,23 +42,40 @@ export const FarcasterProvider = ({ children }) => {
           // Wait for SDK to be ready
           await sdk.actions.ready();
           
-          // Access context properties directly
+          // Access context properties - handle both direct values and getter functions
           try {
-            // The context might be a getter, so access properties directly
-            const userFid = sdk.context?.user?.fid;
-            const username = sdk.context?.user?.username;
-            const displayName = sdk.context?.user?.displayName;
-            const pfpUrl = sdk.context?.user?.pfpUrl;
+            const context = sdk.context;
+            console.log('Raw SDK context:', context);
             
-            console.log('Context user data:', { userFid, username, displayName, pfpUrl });
-            
-            if (userFid) {
-              setContextUser({
-                fid: userFid,
-                username: username || `user${userFid}`,
-                displayName: displayName || '',
-                pfpUrl: pfpUrl || ''
-              });
+            if (context && context.user) {
+              // Extract user data, handling both direct properties and getter functions
+              const extractValue = (value) => {
+                if (typeof value === 'function') {
+                  try {
+                    return value();
+                  } catch (e) {
+                    console.warn('Failed to invoke getter:', e);
+                    return undefined;
+                  }
+                }
+                return value;
+              };
+
+              const userFid = extractValue(context.user.fid);
+              const username = extractValue(context.user.username);
+              const displayName = extractValue(context.user.displayName);
+              const pfpUrl = extractValue(context.user.pfpUrl);
+              
+              console.log('Extracted context user data:', { userFid, username, displayName, pfpUrl });
+              
+              if (userFid) {
+                setContextUser({
+                  fid: userFid,
+                  username: username || `user${userFid}`,
+                  displayName: displayName || username || '',
+                  pfpUrl: pfpUrl || ''
+                });
+              }
             }
           } catch (contextError) {
             console.error('Error accessing context:', contextError);
@@ -74,12 +91,25 @@ export const FarcasterProvider = ({ children }) => {
           // Development mode
           console.log('Running in development mode');
           if (process.env.NODE_ENV === 'development') {
-            setContextUser({
+            // Create a mock user for development
+            const mockUser = {
               fid: 12345,
               username: 'testuser',
               displayName: 'Test User',
               pfpUrl: ''
-            });
+            };
+            setContextUser(mockUser);
+            
+            // Auto-authenticate in development
+            const mockAuth = {
+              token: 'mock-token',
+              method: 'development',
+              timestamp: Date.now()
+            };
+            
+            // Create user in database
+            await loadOrCreateUser(mockUser.fid, mockUser);
+            setIsAuthenticated(true);
           }
         }
       } catch (error) {
@@ -94,6 +124,8 @@ export const FarcasterProvider = ({ children }) => {
   }, []);
 
   const isTokenExpired = (token) => {
+    if (token === 'mock-token') return false; // Development token never expires
+    
     try {
       const payload = parseJwt(token);
       if (!payload || !payload.exp) return true;
@@ -105,6 +137,16 @@ export const FarcasterProvider = ({ children }) => {
 
   const loadUserFromAuth = async (authData) => {
     try {
+      // Handle mock token for development
+      if (authData.token === 'mock-token') {
+        if (contextUser) {
+          await loadOrCreateUser(contextUser.fid, contextUser);
+          setAuthToken(authData.token);
+          setIsAuthenticated(true);
+        }
+        return;
+      }
+
       const payload = parseJwt(authData.token);
       if (!payload || !payload.sub) {
         throw new Error('Invalid token');
@@ -112,13 +154,16 @@ export const FarcasterProvider = ({ children }) => {
 
       const fid = typeof payload.sub === 'string' ? parseInt(payload.sub) : payload.sub;
       
-      // Get user data from context or token
-      const userData = {
+      // Get user data from context or use FID
+      const userData = contextUser || {
         fid,
-        username: contextUser?.username || `user${fid}`,
-        display_name: contextUser?.displayName || '',
-        pfp_url: contextUser?.pfpUrl || ''
+        username: `user${fid}`,
+        display_name: '',
+        pfp_url: ''
       };
+      
+      // Ensure FID matches
+      userData.fid = fid;
       
       // Load or create user in database
       await loadOrCreateUser(fid, userData);
@@ -134,15 +179,19 @@ export const FarcasterProvider = ({ children }) => {
 
   const loadOrCreateUser = async (fid, userData) => {
     try {
-      // First, set the FID for RLS (without await to avoid blocking)
-      setCurrentUserFid(fid).catch(console.error);
+      console.log('Loading/creating user with data:', userData);
+      
+      // Set the FID for RLS (don't await to avoid blocking)
+      setCurrentUserFid(fid).catch(err => 
+        console.warn('Could not set RLS context (non-critical):', err)
+      );
 
       // Try to fetch existing user
       const { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('*')
         .eq('fid', fid)
-        .maybeSingle(); // Use maybeSingle instead of single to avoid error if not found
+        .maybeSingle();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('Error fetching user:', fetchError);
@@ -155,17 +204,22 @@ export const FarcasterProvider = ({ children }) => {
         console.log('Creating new user for FID:', fid);
         
         // Create new user with all required fields
+        const newUserData = {
+          fid: fid,
+          username: userData.username || `user${fid}`,
+          display_name: userData.display_name || userData.displayName || userData.username || '',
+          pfp_url: userData.pfp_url || userData.pfpUrl || '',
+          bio: userData.bio || '',
+          total_points: 0,
+          total_quizzes_taken: 0,
+          created_at: new Date().toISOString()
+        };
+
+        console.log('Creating user with data:', newUserData);
+
         const { data: newUser, error: createError } = await supabase
           .from('users')
-          .insert({
-            fid: fid,
-            username: userData.username || `user${fid}`,
-            display_name: userData.display_name || userData.username || '',
-            pfp_url: userData.pfp_url || '',
-            bio: '',
-            total_points: 0,
-            total_quizzes_taken: 0
-          })
+          .insert(newUserData)
           .select()
           .single();
 
@@ -175,40 +229,68 @@ export const FarcasterProvider = ({ children }) => {
         }
         
         user = newUser;
+        console.log('User created successfully:', user);
       } else {
+        console.log('User already exists:', existingUser);
+        
         // Update user info if changed
         const updates = {};
-        if (userData.username && userData.username !== existingUser.username) {
-          updates.username = userData.username;
+        
+        // Handle both naming conventions
+        const newUsername = userData.username || userData.displayName;
+        const newDisplayName = userData.display_name || userData.displayName || userData.username;
+        const newPfpUrl = userData.pfp_url || userData.pfpUrl;
+        
+        if (newUsername && newUsername !== existingUser.username) {
+          updates.username = newUsername;
         }
-        if (userData.display_name && userData.display_name !== existingUser.display_name) {
-          updates.display_name = userData.display_name;
+        if (newDisplayName && newDisplayName !== existingUser.display_name) {
+          updates.display_name = newDisplayName;
         }
-        if (userData.pfp_url && userData.pfp_url !== existingUser.pfp_url) {
-          updates.pfp_url = userData.pfp_url;
+        if (newPfpUrl && newPfpUrl !== existingUser.pfp_url) {
+          updates.pfp_url = newPfpUrl;
         }
 
         if (Object.keys(updates).length > 0) {
-          const { data: updatedUser } = await supabase
+          console.log('Updating user with:', updates);
+          const { data: updatedUser, error: updateError } = await supabase
             .from('users')
             .update(updates)
             .eq('id', existingUser.id)
             .select()
             .single();
           
-          if (updatedUser) user = updatedUser;
+          if (updateError) {
+            console.error('Error updating user:', updateError);
+          } else if (updatedUser) {
+            user = updatedUser;
+          }
         }
       }
 
       setCurrentUser(user);
+      console.log('Current user set:', user);
     } catch (error) {
-      console.error('Error loading/creating user:', error);
+      console.error('Error in loadOrCreateUser:', error);
       throw error;
     }
   };
 
   const signIn = async () => {
     if (!isInMiniApp) {
+      // In development, auto-sign in
+      if (process.env.NODE_ENV === 'development' && contextUser) {
+        const mockAuth = {
+          token: 'mock-token',
+          method: 'development',
+          timestamp: Date.now()
+        };
+        
+        storeAuthData(mockAuth);
+        await loadUserFromAuth(mockAuth);
+        return { success: true };
+      }
+      
       setError('Sign in is only available in Farcaster');
       return { success: false, error: 'Not in Farcaster context' };
     }
@@ -255,7 +337,8 @@ export const FarcasterProvider = ({ children }) => {
 
   const shareQuiz = async (quizData) => {
     if (!isInMiniApp) {
-      throw new Error('Sharing is only available in Farcaster');
+      console.warn('Sharing is only available in Farcaster');
+      return null;
     }
 
     try {
@@ -275,7 +358,8 @@ export const FarcasterProvider = ({ children }) => {
 
   const shareResult = async (resultData) => {
     if (!isInMiniApp) {
-      throw new Error('Sharing is only available in Farcaster');
+      console.warn('Sharing is only available in Farcaster');
+      return null;
     }
 
     try {
@@ -296,13 +380,15 @@ export const FarcasterProvider = ({ children }) => {
   const refreshUser = async () => {
     if (currentUser && currentUser.id) {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('users')
           .select('*')
           .eq('id', currentUser.id)
           .single();
         
-        if (data) {
+        if (error) {
+          console.error('Error refreshing user:', error);
+        } else if (data) {
           setCurrentUser(data);
         }
       } catch (error) {
