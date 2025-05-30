@@ -43,6 +43,43 @@ export const FarcasterProvider = ({ children }) => {
           // Hide splash screen
           await sdk.actions.ready();
           
+          // Wait for context to be available
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Try to get context data
+          try {
+            console.log('Attempting to get context...');
+            // Try direct access as shown in docs
+            const contextData = sdk.context;
+            console.log('Context data:', contextData);
+            
+            // Try to access user directly
+            if (contextData && contextData.user) {
+              console.log('User from context:', contextData.user);
+              
+              // Try to extract values
+              const userData = {
+                fid: contextData.user.fid,
+                username: contextData.user.username,
+                displayName: contextData.user.displayName,
+                pfpUrl: contextData.user.pfpUrl || contextData.user.pfp
+              };
+              
+              console.log('Extracted user data:', userData);
+              
+              if (userData.fid) {
+                setContextUser({
+                  fid: userData.fid,
+                  username: userData.username || `user${userData.fid}`,
+                  displayName: userData.displayName || '',
+                  pfpUrl: userData.pfpUrl || ''
+                });
+              }
+            }
+          } catch (contextError) {
+            console.warn('Could not access context:', contextError);
+          }
+          
           // Check for existing auth session
           const storedAuth = getStoredAuthData();
           if (storedAuth && !isTokenExpired(storedAuth.token)) {
@@ -80,10 +117,31 @@ export const FarcasterProvider = ({ children }) => {
     try {
       console.log('Performing auto sign-in...');
       
-      // Generate a nonce for the sign-in request
-      const nonce = generateSecureNonce();
+      // First try QuickAuth to get user info
+      try {
+        const { token } = await sdk.experimental.quickAuth();
+        console.log('QuickAuth successful');
+        
+        // Parse token to get user info
+        const payload = parseJwt(token);
+        console.log('QuickAuth payload:', payload);
+        
+        const authData = {
+          token,
+          method: 'quickAuth',
+          timestamp: Date.now()
+        };
+        
+        storeAuthData(authData);
+        await loadUserFromAuth(authData);
+        
+        return { success: true };
+      } catch (quickAuthError) {
+        console.warn('QuickAuth failed, falling back to SIWF:', quickAuthError);
+      }
       
-      // Request sign in with Farcaster
+      // Fallback to SIWF
+      const nonce = generateSecureNonce();
       const signInResult = await sdk.actions.signIn({
         nonce,
         acceptAuthAddress: true,
@@ -95,24 +153,42 @@ export const FarcasterProvider = ({ children }) => {
       const userInfo = parseSIWFMessage(signInResult.message);
       console.log('Parsed user info from SIWF:', userInfo);
       
-      if (userInfo) {
-        // Set context user from SIWF message
+      // Try to get additional user info from context after sign in
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      try {
+        const contextData = sdk.context;
+        if (contextData && contextData.user) {
+          console.log('Context user after sign in:', contextData.user);
+          
+          if (userInfo && contextData.user.fid === userInfo.fid) {
+            // Merge context data with SIWF data
+            userInfo.username = contextData.user.username || userInfo.username;
+            userInfo.displayName = contextData.user.displayName || userInfo.displayName;
+            userInfo.pfpUrl = contextData.user.pfpUrl || contextData.user.pfp || userInfo.pfpUrl;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not get context after sign in:', e);
+      }
+      
+      if (userInfo && userInfo.fid) {
         setContextUser({
           fid: userInfo.fid,
           username: userInfo.username || `user${userInfo.fid}`,
-          displayName: userInfo.displayName || userInfo.username || '',
+          displayName: userInfo.displayName || '',
           pfpUrl: userInfo.pfpUrl || ''
         });
       }
       
-      // Use QuickAuth for session token
+      // Get QuickAuth token for session
       const { token } = await sdk.experimental.quickAuth();
       
       const authData = {
         token,
-        method: 'quickAuth',
+        method: 'siwf',
         timestamp: Date.now(),
-        userInfo // Store the parsed user info
+        userInfo
       };
       
       storeAuthData(authData);
@@ -121,31 +197,33 @@ export const FarcasterProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       console.error('Auto sign-in failed:', error);
-      // Don't set error state for auto sign-in failure
       return { success: false, error: error.message };
     }
   };
 
   const parseSIWFMessage = (message) => {
     try {
-      // SIWF message format includes user info
-      // Parse the message to extract FID and other details
       const lines = message.split('\n');
       let fid = null;
       let address = null;
       
       for (const line of lines) {
-        if (line.includes('Farcaster ID:')) {
-          fid = parseInt(line.split(':')[1].trim());
-        } else if (line.includes('wants you to sign in with your Ethereum account:')) {
-          address = line.split(':')[1].trim();
+        if (line.includes('farcaster://fid/')) {
+          const match = line.match(/farcaster:\/\/fid\/(\d+)/);
+          if (match) {
+            fid = parseInt(match[1]);
+          }
+        } else if (line.includes('0x')) {
+          const match = line.match(/(0x[a-fA-F0-9]{40})/);
+          if (match) {
+            address = match[1];
+          }
         }
       }
       
       return {
         fid,
         address,
-        // These might not be in the SIWF message, but we'll get them from QuickAuth context
         username: null,
         displayName: null,
         pfpUrl: null
@@ -157,8 +235,6 @@ export const FarcasterProvider = ({ children }) => {
   };
 
   const isTokenExpired = (token) => {
-    if (token === 'mock-token') return false;
-    
     try {
       const payload = parseJwt(token);
       if (!payload || !payload.exp) return true;
@@ -250,8 +326,49 @@ export const FarcasterProvider = ({ children }) => {
       } else {
         console.log('User already exists:', existingUser);
         
-        // For now, don't update existing users
-        // We'll need a proper way to get user profile data
+        // Update user if we have new data
+        const updates = {};
+        let needsUpdate = false;
+        
+        // Only update if we have real data (not default values)
+        if (userData.username && 
+            !userData.username.match(/^user\d+$/) && 
+            userData.username !== existingUser.username) {
+          updates.username = String(userData.username);
+          needsUpdate = true;
+        }
+        
+        if (userData.display_name && 
+            userData.display_name !== existingUser.display_name &&
+            userData.display_name !== `user${fid}`) {
+          updates.display_name = String(userData.display_name);
+          needsUpdate = true;
+        }
+        
+        if (userData.pfp_url && 
+            userData.pfp_url !== existingUser.pfp_url &&
+            userData.pfp_url !== '{}') {
+          updates.pfp_url = String(userData.pfp_url);
+          needsUpdate = true;
+        }
+
+        if (needsUpdate && Object.keys(updates).length > 0) {
+          console.log('Updating user with:', updates);
+          
+          const { data: updatedUser, error: updateError } = await supabase
+            .from('users')
+            .update(updates)
+            .eq('id', existingUser.id)
+            .select()
+            .single();
+          
+          if (updateError) {
+            console.error('Error updating user:', updateError);
+          } else if (updatedUser) {
+            user = updatedUser;
+            console.log('User updated successfully');
+          }
+        }
       }
 
       setCurrentUser(user);
@@ -272,7 +389,6 @@ export const FarcasterProvider = ({ children }) => {
       setIsSigningIn(true);
       console.log('Starting manual sign in process...');
 
-      // Perform sign in
       const result = await performSignIn();
       
       if (result.success) {
