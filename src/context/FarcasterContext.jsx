@@ -42,40 +42,45 @@ export const FarcasterProvider = ({ children }) => {
           // Wait for SDK to be ready
           await sdk.actions.ready();
           
-          // Access context properties - handle both direct values and getter functions
+          // Give SDK a moment to initialize context
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Access context - it should be available as a direct property
           try {
-            const context = sdk.context;
-            console.log('Raw SDK context:', context);
+            console.log('Accessing SDK context...');
             
-            if (context && context.user) {
-              // Extract user data, handling both direct properties and getter functions
-              const extractValue = (value) => {
-                if (typeof value === 'function') {
-                  try {
-                    return value();
-                  } catch (e) {
-                    console.warn('Failed to invoke getter:', e);
-                    return undefined;
-                  }
-                }
-                return value;
+            // Try different ways to access the context
+            let userContext = null;
+            
+            // Method 1: Direct access
+            if (sdk.context && sdk.context.user) {
+              userContext = sdk.context.user;
+              console.log('Got context via direct access:', userContext);
+            }
+            
+            // If we have user context, extract the values
+            if (userContext) {
+              // These should be direct properties, not functions
+              const userData = {
+                fid: userContext.fid,
+                username: userContext.username,
+                displayName: userContext.displayName,
+                pfpUrl: userContext.pfpUrl
               };
-
-              const userFid = extractValue(context.user.fid);
-              const username = extractValue(context.user.username);
-              const displayName = extractValue(context.user.displayName);
-              const pfpUrl = extractValue(context.user.pfpUrl);
               
-              console.log('Extracted context user data:', { userFid, username, displayName, pfpUrl });
+              console.log('Extracted user data:', userData);
               
-              if (userFid) {
+              // Only set context user if we have valid data
+              if (userData.fid) {
                 setContextUser({
-                  fid: userFid,
-                  username: username || `user${userFid}`,
-                  displayName: displayName || username || '',
-                  pfpUrl: pfpUrl || ''
+                  fid: userData.fid,
+                  username: userData.username || `user${userData.fid}`,
+                  displayName: userData.displayName || '',
+                  pfpUrl: userData.pfpUrl || ''
                 });
               }
+            } else {
+              console.warn('No user context available from SDK');
             }
           } catch (contextError) {
             console.error('Error accessing context:', contextError);
@@ -96,20 +101,9 @@ export const FarcasterProvider = ({ children }) => {
               fid: 12345,
               username: 'testuser',
               displayName: 'Test User',
-              pfpUrl: ''
+              pfpUrl: 'https://i.imgur.com/ybEiKVK.png' // Default avatar
             };
             setContextUser(mockUser);
-            
-            // Auto-authenticate in development
-            const mockAuth = {
-              token: 'mock-token',
-              method: 'development',
-              timestamp: Date.now()
-            };
-            
-            // Create user in database
-            await loadOrCreateUser(mockUser.fid, mockUser);
-            setIsAuthenticated(true);
           }
         }
       } catch (error) {
@@ -154,16 +148,13 @@ export const FarcasterProvider = ({ children }) => {
 
       const fid = typeof payload.sub === 'string' ? parseInt(payload.sub) : payload.sub;
       
-      // Get user data from context or use FID
-      const userData = contextUser || {
+      // Use context user data if available, otherwise create minimal user
+      const userData = contextUser && contextUser.fid === fid ? contextUser : {
         fid,
         username: `user${fid}`,
         display_name: '',
         pfp_url: ''
       };
-      
-      // Ensure FID matches
-      userData.fid = fid;
       
       // Load or create user in database
       await loadOrCreateUser(fid, userData);
@@ -203,19 +194,24 @@ export const FarcasterProvider = ({ children }) => {
       if (!existingUser) {
         console.log('Creating new user for FID:', fid);
         
+        // Ensure we have valid string values, not objects
+        const cleanUsername = userData.username || `user${fid}`;
+        const cleanDisplayName = userData.display_name || userData.displayName || cleanUsername;
+        const cleanPfpUrl = userData.pfp_url || userData.pfpUrl || '';
+        
         // Create new user with all required fields
         const newUserData = {
           fid: fid,
-          username: userData.username || `user${fid}`,
-          display_name: userData.display_name || userData.displayName || userData.username || '',
-          pfp_url: userData.pfp_url || userData.pfpUrl || '',
-          bio: userData.bio || '',
+          username: String(cleanUsername),
+          display_name: String(cleanDisplayName),
+          pfp_url: String(cleanPfpUrl),
+          bio: '',
           total_points: 0,
           total_quizzes_taken: 0,
           created_at: new Date().toISOString()
         };
 
-        console.log('Creating user with data:', newUserData);
+        console.log('Creating user with cleaned data:', newUserData);
 
         const { data: newUser, error: createError } = await supabase
           .from('users')
@@ -233,25 +229,34 @@ export const FarcasterProvider = ({ children }) => {
       } else {
         console.log('User already exists:', existingUser);
         
-        // Update user info if changed
+        // Fix any invalid data in existing user
         const updates = {};
+        let needsUpdate = false;
         
-        // Handle both naming conventions
-        const newUsername = userData.username || userData.displayName;
-        const newDisplayName = userData.display_name || userData.displayName || userData.username;
-        const newPfpUrl = userData.pfp_url || userData.pfpUrl;
+        // Check if display_name or pfp_url are invalid (like "{}")
+        if (existingUser.display_name === '{}' || existingUser.display_name === '') {
+          const newDisplayName = userData.display_name || userData.displayName || userData.username || existingUser.username;
+          if (newDisplayName && newDisplayName !== '{}') {
+            updates.display_name = String(newDisplayName);
+            needsUpdate = true;
+          }
+        }
         
-        if (newUsername && newUsername !== existingUser.username) {
-          updates.username = newUsername;
+        if (existingUser.pfp_url === '{}' || (userData.pfpUrl && userData.pfpUrl !== existingUser.pfp_url)) {
+          const newPfpUrl = userData.pfp_url || userData.pfpUrl || '';
+          if (newPfpUrl && newPfpUrl !== '{}') {
+            updates.pfp_url = String(newPfpUrl);
+            needsUpdate = true;
+          }
         }
-        if (newDisplayName && newDisplayName !== existingUser.display_name) {
-          updates.display_name = newDisplayName;
-        }
-        if (newPfpUrl && newPfpUrl !== existingUser.pfp_url) {
-          updates.pfp_url = newPfpUrl;
+        
+        // Update username if we have better data from context
+        if (userData.username && userData.username !== existingUser.username && !userData.username.startsWith('user')) {
+          updates.username = String(userData.username);
+          needsUpdate = true;
         }
 
-        if (Object.keys(updates).length > 0) {
+        if (needsUpdate && Object.keys(updates).length > 0) {
           console.log('Updating user with:', updates);
           const { data: updatedUser, error: updateError } = await supabase
             .from('users')
@@ -264,12 +269,12 @@ export const FarcasterProvider = ({ children }) => {
             console.error('Error updating user:', updateError);
           } else if (updatedUser) {
             user = updatedUser;
+            console.log('User updated successfully:', user);
           }
         }
       }
 
       setCurrentUser(user);
-      console.log('Current user set:', user);
     } catch (error) {
       console.error('Error in loadOrCreateUser:', error);
       throw error;
@@ -278,19 +283,6 @@ export const FarcasterProvider = ({ children }) => {
 
   const signIn = async () => {
     if (!isInMiniApp) {
-      // In development, auto-sign in
-      if (process.env.NODE_ENV === 'development' && contextUser) {
-        const mockAuth = {
-          token: 'mock-token',
-          method: 'development',
-          timestamp: Date.now()
-        };
-        
-        storeAuthData(mockAuth);
-        await loadUserFromAuth(mockAuth);
-        return { success: true };
-      }
-      
       setError('Sign in is only available in Farcaster');
       return { success: false, error: 'Not in Farcaster context' };
     }
@@ -300,7 +292,26 @@ export const FarcasterProvider = ({ children }) => {
       setIsSigningIn(true);
       console.log('Starting sign in process...');
 
-      // Use QuickAuth for simpler authentication
+      // First, try to get fresh context data
+      if (sdk.context && sdk.context.user) {
+        const userData = {
+          fid: sdk.context.user.fid,
+          username: sdk.context.user.username,
+          displayName: sdk.context.user.displayName,
+          pfpUrl: sdk.context.user.pfpUrl
+        };
+        
+        if (userData.fid && !contextUser) {
+          setContextUser({
+            fid: userData.fid,
+            username: userData.username || `user${userData.fid}`,
+            displayName: userData.displayName || '',
+            pfpUrl: userData.pfpUrl || ''
+          });
+        }
+      }
+
+      // Use QuickAuth for authentication
       const { token } = await sdk.experimental.quickAuth();
       console.log('QuickAuth successful');
 
