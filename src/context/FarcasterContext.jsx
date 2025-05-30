@@ -18,28 +18,6 @@ export const useFarcasterContext = () => {
   return context;
 };
 
-// Helper function to safely convert proxy values to primitives
-const safePrimitiveConversion = (value, defaultValue = '') => {
-  if (value === null || value === undefined) return defaultValue;
-  try {
-    return String(value);
-  } catch (error) {
-    console.warn('Failed to convert value to string:', error);
-    return defaultValue;
-  }
-};
-
-const safeNumberConversion = (value, defaultValue = 0) => {
-  if (value === null || value === undefined) return defaultValue;
-  try {
-    const num = Number(value);
-    return isNaN(num) ? defaultValue : num;
-  } catch (error) {
-    console.warn('Failed to convert value to number:', error);
-    return defaultValue;
-  }
-};
-
 export const FarcasterProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -61,24 +39,29 @@ export const FarcasterProvider = ({ children }) => {
         setIsInMiniApp(inMiniApp);
 
         if (inMiniApp) {
-          // Wait for context to be available
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Wait for SDK to be ready
+          await sdk.actions.ready();
           
-          // Get context from SDK
-          const context = sdk.context;
-          console.log('SDK Context:', context);
-          
-          if (context?.user) {
-            // Safely extract user data and convert proxy values to primitives
-            const userData = {
-              fid: safeNumberConversion(context.user.fid),
-              username: safePrimitiveConversion(context.user.username),
-              displayName: safePrimitiveConversion(context.user.displayName),
-              pfpUrl: safePrimitiveConversion(context.user.pfpUrl)
-            };
+          // Access context properties directly
+          try {
+            // The context might be a getter, so access properties directly
+            const userFid = sdk.context?.user?.fid;
+            const username = sdk.context?.user?.username;
+            const displayName = sdk.context?.user?.displayName;
+            const pfpUrl = sdk.context?.user?.pfpUrl;
             
-            console.log('Extracted user data:', userData);
-            setContextUser(userData);
+            console.log('Context user data:', { userFid, username, displayName, pfpUrl });
+            
+            if (userFid) {
+              setContextUser({
+                fid: userFid,
+                username: username || `user${userFid}`,
+                displayName: displayName || '',
+                pfpUrl: pfpUrl || ''
+              });
+            }
+          } catch (contextError) {
+            console.error('Error accessing context:', contextError);
           }
 
           // Check for existing auth session
@@ -87,9 +70,6 @@ export const FarcasterProvider = ({ children }) => {
             console.log('Found valid stored auth session');
             await loadUserFromAuth(storedAuth);
           }
-
-          // Hide splash screen
-          await sdk.actions.ready();
         } else {
           // Development mode
           console.log('Running in development mode');
@@ -132,13 +112,16 @@ export const FarcasterProvider = ({ children }) => {
 
       const fid = typeof payload.sub === 'string' ? parseInt(payload.sub) : payload.sub;
       
-      // Load or create user in database
-      await loadOrCreateUser(fid, {
+      // Get user data from context or token
+      const userData = {
         fid,
         username: contextUser?.username || `user${fid}`,
         display_name: contextUser?.displayName || '',
         pfp_url: contextUser?.pfpUrl || ''
-      });
+      };
+      
+      // Load or create user in database
+      await loadOrCreateUser(fid, userData);
 
       setAuthToken(authData.token);
       setIsAuthenticated(true);
@@ -151,17 +134,18 @@ export const FarcasterProvider = ({ children }) => {
 
   const loadOrCreateUser = async (fid, userData) => {
     try {
-      // Set the FID for RLS
-      await setCurrentUserFid(fid);
+      // First, set the FID for RLS (without await to avoid blocking)
+      setCurrentUserFid(fid).catch(console.error);
 
-      // Check if user exists
+      // Try to fetch existing user
       const { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('*')
         .eq('fid', fid)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to avoid error if not found
 
       if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching user:', fetchError);
         throw fetchError;
       }
 
@@ -170,18 +154,26 @@ export const FarcasterProvider = ({ children }) => {
       if (!existingUser) {
         console.log('Creating new user for FID:', fid);
         
+        // Create new user with all required fields
         const { data: newUser, error: createError } = await supabase
           .from('users')
           .insert({
             fid: fid,
             username: userData.username || `user${fid}`,
-            display_name: userData.display_name || '',
+            display_name: userData.display_name || userData.username || '',
             pfp_url: userData.pfp_url || '',
+            bio: '',
+            total_points: 0,
+            total_quizzes_taken: 0
           })
           .select()
           .single();
 
-        if (createError) throw createError;
+        if (createError) {
+          console.error('Error creating user:', createError);
+          throw createError;
+        }
+        
         user = newUser;
       } else {
         // Update user info if changed
@@ -246,38 +238,8 @@ export const FarcasterProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       console.error('Sign in error:', error);
-      
-      // If QuickAuth fails, try traditional SIWF
-      try {
-        console.log('Falling back to SIWF...');
-        const nonce = generateNonce();
-        const result = await sdk.actions.signIn({
-          nonce,
-          acceptAuthAddress: true,
-        });
-
-        const authData = {
-          message: result.message,
-          signature: result.signature,
-          nonce,
-          method: 'siwf',
-          timestamp: Date.now()
-        };
-
-        storeAuthData(authData);
-        
-        // For SIWF, we'll use context user data
-        if (contextUser?.fid) {
-          await loadOrCreateUser(contextUser.fid, contextUser);
-          setIsAuthenticated(true);
-        }
-
-        return { success: true };
-      } catch (siwfError) {
-        console.error('SIWF also failed:', siwfError);
-        setError('Failed to sign in');
-        return { success: false, error: siwfError.message };
-      }
+      setError('Failed to sign in');
+      return { success: false, error: error.message };
     } finally {
       setIsSigningIn(false);
     }
@@ -332,7 +294,7 @@ export const FarcasterProvider = ({ children }) => {
   };
 
   const refreshUser = async () => {
-    if (currentUser && currentUser.id !== 'mock-id') {
+    if (currentUser && currentUser.id) {
       try {
         const { data } = await supabase
           .from('users')

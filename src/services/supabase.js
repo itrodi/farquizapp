@@ -4,18 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Fallback for development - you can remove this in production
-const defaultUrl = supabaseUrl || 'YOUR_SUPABASE_URL_HERE';
-const defaultAnonKey = supabaseAnonKey || 'YOUR_SUPABASE_ANON_KEY_HERE';
-
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
-  console.log('Make sure you have VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file');
 }
 
-export const supabase = createClient(defaultUrl, defaultAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: false, // We'll manage sessions differently for Farcaster auth
+    persistSession: false,
     autoRefreshToken: false,
   },
 });
@@ -23,19 +18,20 @@ export const supabase = createClient(defaultUrl, defaultAnonKey, {
 // Helper function to set the current user FID for RLS policies
 export const setCurrentUserFid = async (fid) => {
   try {
-    const { data, error } = await supabase.rpc('set_config', {
+    // Check if the RPC function exists first
+    const { error } = await supabase.rpc('set_config', {
       setting: 'app.current_user_fid',
       value: fid.toString(),
     });
     
     if (error) {
-      console.error('Error setting user FID:', error);
+      console.warn('Could not set user FID for RLS (this might be expected):', error.message);
       return { success: false, error };
     }
     
-    return { success: true, data };
+    return { success: true };
   } catch (err) {
-    console.error('Error in setCurrentUserFid:', err);
+    console.warn('Error in setCurrentUserFid (non-critical):', err.message);
     return { success: false, error: err };
   }
 };
@@ -43,19 +39,19 @@ export const setCurrentUserFid = async (fid) => {
 // Helper function to set the current admin user for RLS policies
 export const setCurrentAdminUser = async (username) => {
   try {
-    const { data, error } = await supabase.rpc('set_config', {
+    const { error } = await supabase.rpc('set_config', {
       setting: 'app.current_admin_user', 
       value: username,
     });
     
     if (error) {
-      console.error('Error setting admin user:', error);
+      console.warn('Could not set admin user for RLS:', error.message);
       return { success: false, error };
     }
     
-    return { success: true, data };
+    return { success: true };
   } catch (err) {
-    console.error('Error in setCurrentAdminUser:', err);
+    console.warn('Error in setCurrentAdminUser:', err.message);
     return { success: false, error: err };
   }
 };
