@@ -42,41 +42,24 @@ export const FarcasterProvider = ({ children }) => {
           // Wait for SDK to be ready
           await sdk.actions.ready();
           
-          // Access context properties
+          // Wait a bit for context to be available
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Access context directly as shown in the documentation
           try {
             console.log('Accessing SDK context...');
             
-            // The context might be a getter function itself
-            let frameContext = sdk.context;
-            
-            // If context is a function, invoke it
-            if (typeof frameContext === 'function') {
-              frameContext = frameContext();
-            }
-            
-            console.log('Frame context:', frameContext);
-            
-            if (frameContext && frameContext.user) {
-              // Extract user data by invoking getter functions if needed
-              const extractValue = (obj, key) => {
-                const value = obj[key];
-                if (typeof value === 'function') {
-                  try {
-                    return value();
-                  } catch (e) {
-                    console.warn(`Failed to invoke ${key}:`, e);
-                    return undefined;
-                  }
-                }
-                return value;
-              };
-
-              const userObj = frameContext.user;
+            // According to the docs, context should be accessed directly
+            if (sdk.context && sdk.context.user) {
+              const user = sdk.context.user;
+              console.log('Context user:', user);
+              
+              // Extract user data - note the docs show 'pfp' not 'pfpUrl'
               const userData = {
-                fid: extractValue(userObj, 'fid'),
-                username: extractValue(userObj, 'username'),
-                displayName: extractValue(userObj, 'displayName'),
-                pfpUrl: extractValue(userObj, 'pfpUrl')
+                fid: user.fid,
+                username: user.username,
+                displayName: user.displayName,
+                pfpUrl: user.pfpUrl || user.pfp // Handle both property names
               };
               
               console.log('Extracted user data:', userData);
@@ -89,18 +72,12 @@ export const FarcasterProvider = ({ children }) => {
                   displayName: userData.displayName || '',
                   pfpUrl: userData.pfpUrl || ''
                 });
-                
-                console.log('Context user set:', {
-                  fid: userData.fid,
-                  username: userData.username,
-                  displayName: userData.displayName,
-                  pfpUrl: userData.pfpUrl
-                });
               }
+            } else {
+              console.warn('No user context available');
             }
           } catch (contextError) {
             console.error('Error accessing context:', contextError);
-            // Don't fail initialization if context access fails
           }
 
           // Check for existing auth session
@@ -268,7 +245,6 @@ export const FarcasterProvider = ({ children }) => {
           
           if (updateError) {
             console.error('Error updating user:', updateError);
-            // Continue with existing user even if update fails
           } else if (updatedUser) {
             user = updatedUser;
             console.log('User updated successfully');
@@ -294,25 +270,15 @@ export const FarcasterProvider = ({ children }) => {
       setIsSigningIn(true);
       console.log('Starting sign in process...');
 
-      // Try to refresh context data before signing in
+      // Try to get context data before signing in
       try {
-        let frameContext = sdk.context;
-        if (typeof frameContext === 'function') {
-          frameContext = frameContext();
-        }
-        
-        if (frameContext && frameContext.user) {
-          const extractValue = (obj, key) => {
-            const value = obj[key];
-            return typeof value === 'function' ? value() : value;
-          };
-
-          const userObj = frameContext.user;
+        if (sdk.context && sdk.context.user) {
+          const user = sdk.context.user;
           const userData = {
-            fid: extractValue(userObj, 'fid'),
-            username: extractValue(userObj, 'username'),
-            displayName: extractValue(userObj, 'displayName'),
-            pfpUrl: extractValue(userObj, 'pfpUrl')
+            fid: user.fid,
+            username: user.username,
+            displayName: user.displayName,
+            pfpUrl: user.pfpUrl || user.pfp
           };
           
           if (userData.fid && (!contextUser || contextUser.fid !== userData.fid)) {
@@ -325,7 +291,7 @@ export const FarcasterProvider = ({ children }) => {
           }
         }
       } catch (e) {
-        console.warn('Could not refresh context:', e);
+        console.warn('Could not get context:', e);
       }
 
       // Use QuickAuth
