@@ -42,42 +42,70 @@ export const FarcasterProvider = ({ children }) => {
           // Wait for SDK to be ready
           await sdk.actions.ready();
           
-          // Wait a bit for context to be available
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Give SDK more time to initialize
+          await new Promise(resolve => setTimeout(resolve, 500));
           
-          // Access context directly as shown in the documentation
+          // Try to extract context data
           try {
-            console.log('Accessing SDK context...');
+            console.log('Attempting to access SDK context...');
             
-            // According to the docs, context should be accessed directly
-            if (sdk.context && sdk.context.user) {
-              const user = sdk.context.user;
-              console.log('Context user:', user);
+            // Helper function to extract value from proxy or function
+            const extractValue = (value) => {
+              if (!value) return undefined;
               
-              // Extract user data - note the docs show 'pfp' not 'pfpUrl'
-              const userData = {
-                fid: user.fid,
-                username: user.username,
-                displayName: user.displayName,
-                pfpUrl: user.pfpUrl || user.pfp // Handle both property names
-              };
-              
-              console.log('Extracted user data:', userData);
-              
-              // Only set context user if we have valid FID
-              if (userData.fid) {
-                setContextUser({
-                  fid: userData.fid,
-                  username: userData.username || `user${userData.fid}`,
-                  displayName: userData.displayName || '',
-                  pfpUrl: userData.pfpUrl || ''
-                });
+              // If it's a function, try to invoke it
+              if (typeof value === 'function') {
+                try {
+                  const result = value();
+                  console.log('Invoked function, got:', result);
+                  return result;
+                } catch (e) {
+                  console.warn('Failed to invoke function:', e);
+                  return undefined;
+                }
               }
-            } else {
-              console.warn('No user context available');
+              
+              // If it's already a value, return it
+              return value;
+            };
+
+            // Access the context
+            const context = sdk.context;
+            console.log('Raw context:', context);
+            
+            if (context) {
+              // Try to access user data
+              let userData = {};
+              
+              // If context.user is a function, invoke it
+              const userObj = typeof context.user === 'function' ? context.user() : context.user;
+              console.log('User object:', userObj);
+              
+              if (userObj) {
+                // Extract each property
+                userData.fid = extractValue(userObj.fid);
+                userData.username = extractValue(userObj.username);
+                userData.displayName = extractValue(userObj.displayName);
+                userData.pfpUrl = extractValue(userObj.pfpUrl) || extractValue(userObj.pfp);
+                
+                console.log('Extracted user data:', userData);
+                
+                // Only set context user if we have valid FID
+                if (userData.fid) {
+                  setContextUser({
+                    fid: userData.fid,
+                    username: userData.username || `user${userData.fid}`,
+                    displayName: userData.displayName || '',
+                    pfpUrl: userData.pfpUrl || ''
+                  });
+                  
+                  console.log('Context user set successfully');
+                }
+              }
             }
           } catch (contextError) {
             console.error('Error accessing context:', contextError);
+            // Don't fail - we can still authenticate without context
           }
 
           // Check for existing auth session
@@ -131,7 +159,7 @@ export const FarcasterProvider = ({ children }) => {
 
       const fid = typeof payload.sub === 'string' ? parseInt(payload.sub) : payload.sub;
       
-      // Use context user data if available
+      // Prepare user data
       const userData = contextUser && contextUser.fid === fid ? {
         fid: contextUser.fid,
         username: contextUser.username,
@@ -206,26 +234,27 @@ export const FarcasterProvider = ({ children }) => {
       } else {
         console.log('User already exists:', existingUser);
         
-        // Update user if we have better data
+        // Update user if we have better data from context
         const updates = {};
         let needsUpdate = false;
         
-        // Fix invalid data
-        if (!existingUser.display_name || existingUser.display_name === '{}' || existingUser.display_name === '') {
-          if (userData.display_name && userData.display_name !== '{}') {
-            updates.display_name = String(userData.display_name);
-            needsUpdate = true;
-          }
+        // Update display name if needed
+        if (userData.display_name && 
+            userData.display_name !== existingUser.display_name && 
+            userData.display_name !== `user${fid}`) {
+          updates.display_name = String(userData.display_name);
+          needsUpdate = true;
         }
         
-        if (!existingUser.pfp_url || existingUser.pfp_url === '{}' || existingUser.pfp_url === '') {
-          if (userData.pfp_url && userData.pfp_url !== '{}') {
-            updates.pfp_url = String(userData.pfp_url);
-            needsUpdate = true;
-          }
+        // Update pfp_url if needed
+        if (userData.pfp_url && 
+            userData.pfp_url !== existingUser.pfp_url && 
+            userData.pfp_url !== '{}') {
+          updates.pfp_url = String(userData.pfp_url);
+          needsUpdate = true;
         }
         
-        // Update username if we have a real username (not userXXXXX format)
+        // Update username if needed
         if (userData.username && 
             !userData.username.match(/^user\d+$/) && 
             userData.username !== existingUser.username) {
@@ -270,28 +299,44 @@ export const FarcasterProvider = ({ children }) => {
       setIsSigningIn(true);
       console.log('Starting sign in process...');
 
-      // Try to get context data before signing in
+      // Try one more time to get context data
       try {
-        if (sdk.context && sdk.context.user) {
-          const user = sdk.context.user;
-          const userData = {
-            fid: user.fid,
-            username: user.username,
-            displayName: user.displayName,
-            pfpUrl: user.pfpUrl || user.pfp
-          };
+        const extractValue = (value) => {
+          if (!value) return undefined;
+          if (typeof value === 'function') {
+            try {
+              return value();
+            } catch (e) {
+              return undefined;
+            }
+          }
+          return value;
+        };
+
+        const context = sdk.context;
+        if (context && context.user) {
+          const userObj = typeof context.user === 'function' ? context.user() : context.user;
           
-          if (userData.fid && (!contextUser || contextUser.fid !== userData.fid)) {
-            setContextUser({
-              fid: userData.fid,
-              username: userData.username || `user${userData.fid}`,
-              displayName: userData.displayName || '',
-              pfpUrl: userData.pfpUrl || ''
-            });
+          if (userObj) {
+            const userData = {
+              fid: extractValue(userObj.fid),
+              username: extractValue(userObj.username),
+              displayName: extractValue(userObj.displayName),
+              pfpUrl: extractValue(userObj.pfpUrl) || extractValue(userObj.pfp)
+            };
+            
+            if (userData.fid && (!contextUser || contextUser.fid !== userData.fid)) {
+              setContextUser({
+                fid: userData.fid,
+                username: userData.username || `user${userData.fid}`,
+                displayName: userData.displayName || '',
+                pfpUrl: userData.pfpUrl || ''
+              });
+            }
           }
         }
       } catch (e) {
-        console.warn('Could not get context:', e);
+        console.warn('Could not refresh context:', e);
       }
 
       // Use QuickAuth
